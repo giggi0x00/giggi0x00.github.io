@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><?xml-stylesheet href="/feed_style.xsl" type="text/xsl"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:media="https://www.rssboard.org/media-rss">
+  <channel>
+    <title>Fun on giggi0x00hub</title>
+    <link>https://giggi0x00.github.io/tags/fun/</link>
+    <description>Recent content in Fun on giggi0x00hub</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en-us</language>
+    <copyright>Luigi Fragale - [Creative Commons Attribution 4.0 International License](https://creativecommons.org/licenses/by/4.0/).</copyright>
+    <lastBuildDate>Sat, 30 Nov 2024 09:42:43 +0100</lastBuildDate><atom:link href="https://giggi0x00.github.io/tags/fun/index.xml" rel="self" type="application/rss+xml" /><icon>https://giggi0x00.github.io/logo.svg</icon>
+    
+    
+    <item>
+      <title>Prepare an IoT devices for Power Analysis and Fault Injection</title>
+      <link>https://giggi0x00.github.io/posts/prepare-for-powernalaysis/</link>
+      <pubDate>Sat, 30 Nov 2024 09:42:43 +0100</pubDate>
+      
+      <guid>https://giggi0x00.github.io/posts/prepare-for-powernalaysis/</guid>
+      <description><![CDATA[<p>The purpose of this blog post is to provide a guide on how to prepare a device for fault injection and power analysis attacks. While many blogs focus solely on explaining these attacks, they often overlook the critical preparation phase. We want to showcase a simple hardware modification (but very effective) that will make the attacks to be successful. Within this blog post we will use a classic STM32 development board to demonstrate how to make it susceptible to such attacks.</p>
+<h3 id="what-is-power-analysis">What is Power analysis</h3>
+<p>In a nutshell, power analysis attack falls into the category of side channel attacks, where, any emission of the electronic target under analysis can be turned to a powerful source of information. As implied by the name <code>Power Analysis</code> consists in analyzing the power consumption of the target while performing normal operations.
+For example, imagine the following piece of code:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-c" data-lang="c"><span style="display:flex;"><span><span style="color:#8be9fd">void</span> <span style="color:#50fa7b">checkpassoword</span>(<span style="color:#8be9fd">char</span> <span style="color:#ff79c6">*</span>buffer) {
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#8be9fd">int</span> res <span style="color:#ff79c6">=</span> <span style="color:#50fa7b">strcmp</span>(sPassword, buffer);
+</span></span><span style="display:flex;"><span><span style="color:#ff79c6">if</span> (res <span style="color:#ff79c6">==</span> <span style="color:#bd93f9">0</span>) {
+</span></span><span style="display:flex;"><span>	<span style="color:#50fa7b">unlock_the_secret_garden</span>();
+</span></span><span style="display:flex;"><span>  <span style="color:#ff79c6">return</span> <span style="color:#bd93f9">0</span>;
+</span></span><span style="display:flex;"><span>}
+</span></span><span style="display:flex;"><span><span style="color:#6272a4">//do_nothing..
+</span></span></span><span style="display:flex;"><span><span style="color:#6272a4"></span><span style="color:#ff79c6">return</span> <span style="color:#bd93f9">1</span>;
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><p>It is quite clear that if the password is correct the target will go through an extra set of instructions before returning, meaning that the power consumption will be higher. We want to spot these differences and understand the code paths and instructions being executed. This can be seen also to a transistor level, where there is a correlation between the power consumption and the operations that device is performing. It is therefore important to ensure that the power consumption associated with each action is accurately measured and free from interference. By &ldquo;free from interference,&rdquo; we mean that no additional factors are artificially increasing or decreasing the power used by the device during the analysis.
+The smallest fluctuations in consumption at low levels need to be emphasized in order to achieve accurate results.</p>
+<p>The design of the IoT device, for instance, focuses on maintaining stability by ensuring that tasks and operations are consistently performed with  a stable and constant voltage output. Keeping factors such as digital levels, frequency fluctuations, and power consumption within a trustworthy power level. To achieve so, components like voltage regulator, capacitors, diodes, or transistors play a crucial role.</p>
+<p>In order to effectively attack an electronic device, it is crucial to understand its design, identify key components, and make necessary modifications as required.</p>
+<h3 id="target-of-our-journey">Target of our journey</h3>
+<p>One of the target of our journey is the STM 32 Nucleo-64 development board. The board is a low-cost development platform for STM32 microcontrollers, used for prototyping embedded systems, programming firmware, and expanding with peripherals through Arduino-compatible connectors. It supports debugging and testing via an integrated ST-LINK, and is popular for IoT, automation, and learning purposes. Thus, it was used as subject for our analysis.</p>
+<p>The components on the board are visible on both sides of the PCB:</p>
+<p><img src="/images/prepare-for-poweranalysis/front.jpeg" alt=""></p>
+<p><img src="/images/prepare-for-poweranalysis/back.jpeg" alt=""></p>
+<p>We aim to demonstrate a Simple Power Analysis (SPA) attack on this board. For this purpose, the board has been programmed with firmware designed to emulate a login prompt which grants access to the main device&rsquo;s functionalities.
+The prompt is accessible via the UART interface and the following can be observed in the terminal when a wrong password is typed:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>$ sudo socat /dev/ttyUSB0,b115200,raw,echo<span style="color:#ff79c6">=</span>0,crnl -
+</span></span><span style="display:flex;"><span>Type your password to unlock the device:
+</span></span><span style="display:flex;"><span>AAAAAA
+</span></span><span style="display:flex;"><span>Access denied! 
+</span></span><span style="display:flex;"><span>Type your password to unlock the device:
+</span></span></code></pre></div><p><strong>The attack that will be carried out in order to circumvent this security defense is Simple Power Analysis. The objective is to measure the power consumption of the device while we send different passwords. Through a careful analysis will be possible to identify different cycles that a strcmp function will go through on each inputs</strong></p>
+<h3 id="preparation-of-the-target">Preparation of the target</h3>
+<p>[adding also where and how we tap there  why are and what we are measuring]</p>
+<p>We need to understand the PCB design, components, power lines, sources of randomness, potential security defenses, and any PCB components that could interfere with our attacks.</p>
+<p>First of all let&rsquo;s start by understand the power inputs line of the device. These can be easily identified by following the VCC power lines of our MCU and the available pins.</p>
+<p><img src="/images/prepare-for-poweranalysis/power-tracking-Page-2.drawio.png" alt=""></p>
+<p>The board has a publicly available datasheet; however, even without schematics, it is still possible to understand the power lines and make modifications in most cases. As we can see from the following schematic, there are many capacitors connected between the VCC and Ground. These capacitors, are meant to stabilize the power of the device, ensuring stability and normal execution conditions ( decoupling capacitor). For our purposes we can consider the the decoupling capacitor as if they are device’s local energy storage.</p>
+<p>First schematic, let&rsquo;s identify the capacitor based on what we have discussed earlier.</p>
+<p><img src="/images/prepare-for-poweranalysis/Pasted_image_20240928210141.png" alt=""></p>
+<p>Even without a schematic, these type of capacitors can be identified using a multimeter and a careful inspection of the PCB design.</p>
+<p>These capacitors were marked with yellow dots for identification.</p>
+<p><img src="/images/prepare-for-poweranalysis/power-tracking-Page-3.drawio_.png" alt=""></p>
+<p>However, we can see that other capacitors are still present on the board. These capacitors are related the power input in the following diagram. While we could also consider to remove them, it is possible to bypass the power circuit line using the JP6 connector and disconnect the power lines from the rest of the circuit. This will allow us to have VCC lines not affected by any electronic components, making possible power analysis possible.</p>
+<p><img src="/images/prepare-for-poweranalysis/Pasted_image_20240929035211.png" alt=""></p>
+<hr>
+<h4 id="hardware-modifications">Hardware modifications</h4>
+<p>The identified capacitors were disconnected from the board. As you can see from the following pictures only one pin was disconnected. The usage of soldering station or hot air gun could be very useful in these cases.</p>
+<p><img src="/images/prepare-for-poweranalysis/flipped-front.jpeg" alt=""></p>
+<p><img src="/images/prepare-for-poweranalysis/Pasted_image_20241007221540.png" alt=""></p>
+<hr>
+<h3 id="hardware-setup">Hardware setup</h3>
+<p><img src="/images/prepare-for-poweranalysis/hw_setup_drawio.png" alt=""></p>
+<p><strong>While preparing for the setup, always watch out for ground loop!!!</strong></p>
+<hr>
+<h3 id="time-to-attack-the-password-prompt">Time to attack the password prompt!</h3>
+<p>The board is now ready to be deeply analyzed for the power consumption, aiming to detect voltage fluctuations based on the execution cycles. The attack consists in attack one single byte of the password at the time.
+We can suppose that the device will compare the input with some value inside. This means that a routine like the following one could be implemented in the firmware:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-c" data-lang="c"><span style="display:flex;"><span><span style="color:#8be9fd">void</span> <span style="color:#50fa7b">checkpassoword</span>(<span style="color:#8be9fd">char</span> <span style="color:#ff79c6">*</span>buffer) {
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#8be9fd">int</span> res <span style="color:#ff79c6">=</span> <span style="color:#50fa7b">strcmp</span>(sPassword, buffer);
+</span></span><span style="display:flex;"><span><span style="color:#ff79c6">if</span> (res <span style="color:#ff79c6">==</span> <span style="color:#bd93f9">0</span>) {
+</span></span><span style="display:flex;"><span>	<span style="color:#6272a4">//do something
+</span></span></span><span style="display:flex;"><span><span style="color:#6272a4"></span>}
+</span></span><span style="display:flex;"><span>...
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><p>Without going to much into the detail of the attack, we can simply understand the attack based on the following calculations:</p>
+<p>Let&rsquo;s assume the correct value is <code>AMSDATA</code>.</p>
+<p>We provide the following two inputs: <code>AMSAAAA</code> and <code>AMDDDDD</code>. The <code>strcmp</code> function compares each byte sequentially and returns when a match is found or a mismatch occurs. This means that the more correct characters we provide, the more execution cycles <code>strcmp</code> will take to complete, leading to a more power consumption.</p>
+<p>To fully understand the value of the hardware analysis and the changes made to the board, some power traces were collected before the modifications were implemented</p>
+<p>The power traces correspond to the power measurements of the device while the inputs are being processed.</p>
+<p>Let&rsquo;s have a look at how the power traces look like:
+The power traces before the modification look quite homogeneous, except some random spikes. It is very difficult to identify changes in the pattern across multiple inputs.</p>
+<p><img src="/images/prepare-for-poweranalysis/no_difference_observded.png" alt=""></p>
+<p><img src="/images/prepare-for-poweranalysis/no_difference_observded2.png" alt=""></p>
+<p>The following traces were collected with all capacitors disconnected from the PCB. As you can see, we have similar patterns as before; however, there is a noticeable change in the original power trace that requires further inspection.</p>
+<p><img src="/images/prepare-for-poweranalysis/Figure_1.png" alt=""></p>
+<p>If we zoom into the beginning of the diagram, we can observe that the Red trace diverges significantly from the rest of the power traces.</p>
+<p><img src="/images/prepare-for-poweranalysis/c_char_red_diverges.png" alt=""></p>
+<p>Final attack will come in the following post&hellip; STAY TUNED!</p>
+]]></description>
+      
+    </item>
+    
+    
+  </channel>
+</rss>
