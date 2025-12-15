@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html class="" lang="en-us"><head>
+    
+        <script>
+            if (location.host != new URL("https:\/\/giggi0x00.github.io\/").host) location.href = "https:\/\/giggi0x00.github.io\/"
+        </script>
+    
+    <meta name="robots" content="noai, noimageai">
+    <meta name="viewport" content="width=device-width" />
+    <meta http-equiv="Content-Type" content="text/html;charset=UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=7" />
+
+    <link
+    rel="icon"
+    href='/favicon.png'
+/>
+<link
+    rel="shortcut icon"
+    href='/favicon.ico'
+    type="image/x-icon"
+/>
+<link
+    rel="apple-touch-icon"
+    href='/apple-touch-icon.png'
+/>
+
+    <link
+        rel="icon"
+        href='/logo.svg'
+        type="image/svg+xml"
+    />
+
+<title>
+        
+            Prepare an IoT devices for Power Analysis and Fault Injection  &ndash;
+        
+        giggi0x00hub
+    </title>
+
+    <link href="/symbols-nerd-font/symbols-nerd-font.css" rel="stylesheet" />
+    <link href="/jetbrains-mono/jetbrains-mono.css" rel="stylesheet" />
+
+    
+    
+    <link type="text/css" rel="stylesheet" href=https://giggi0x00.github.io/css/styles.11dd9b4f8e754057ce9e5c871170129bd0727d375643f3c7b3ea1cebc8a713bc0f506e4b359cade525b588692555ecfb93e267b9c03ea713c6c958a883527803.css integrity="sha512-Ed2bT451QFfOnlyHEXASm9ByfTdWQ/PHs&#43;oc68inE7wPUG5LNZyt5SW1iGklVez7k&#43;JnucA&#43;pxPGyViog1J4Aw==" />
+<meta name="author" content="Luigi Fragale" />
+
+    
+        <meta name="keywords" content='fun, hacking, hardware, iot, poweranalysis' />
+    
+    
+        <meta name="description" content="is blog post is to provide a guide on how to prepare a device for fault injection and power analysis attacks. While many blogs focus solely on explaining these attacks, they often overlook the critical preparation phase. We want to showcase a simple hardware modification (but very effective) that will make the attacks to be successful. Within this blog post we will use a classic STM32 development board to demonstrate how to make it susceptible to such attacks.&lt;/p&gt;" />
+    
+
+<meta property="og:site_name"
+    content='giggi0x00hub' />
+
+    <meta property="og:title" content="Prepare an IoT devices for Power Analysis and Fault Injection" />
+    <meta property="og:type" content="article" />
+    
+    <meta
+        property="article:author" content="Luigi Fragale" />
+    <meta
+        property="article:published_time"
+        content='2024-11-30T09:42:43Z&#43;0100' />
+    
+        
+            <meta property="article:tag" content="fun" />
+        
+            <meta property="article:tag" content="hacking" />
+        
+            <meta property="article:tag" content="hardware" />
+        
+            <meta property="article:tag" content="iot" />
+        
+            <meta property="article:tag" content="poweranalysis" />
+        
+    
+    <meta property="og:url" content="https://giggi0x00.github.io/posts/prepare-for-powernalaysis/" />
+    
+    
+    <meta property="og:image"
+        content="https://giggi0x00.github.io/android-chrome-512x512.png" />
+    
+        <meta property="og:description" content="&lt;p&gt;The purpose of this blog post is to provide a guide on how to prepare a device for fault injection and power analysis attacks. While many blogs focus solely " />
+    
+
+<meta name="twitter:card" content="summary_large_image" />
+<meta property="twitter:domain"
+      content='giggi0x00.github.io'
+/>
+<meta property="twitter:url" content="https://giggi0x00.github.io/posts/prepare-for-powernalaysis/" />
+
+
+    <meta name="twitter:title" content="Prepare an IoT devices for Power Analysis and Fault Injection" />
+    
+    
+    
+    <meta name="twitter:image"
+        content="https://giggi0x00.github.io/android-chrome-512x512.png" />
+    
+        <meta name="twitter:description" content="&lt;p&gt;The purpose of this blog post is to provide a guide on how to prepare a device for fault injection and power analysis attacks. While many blogs focus solely " />
+    
+
+<link rel="manifest" href="/manifest/index.json" />
+</head>
+
+
+<body>
+        <div id="baseContainer"><header class="">
+<div class="titleAndSearchContainer">
+        <div id="titleContainer">
+            
+                <a class="unstyledLink" href="/">
+                    <img src='/logo.svg' alt='Logo'/>
+                </a>
+            
+            <div class="rightOfLogo">
+                <div class="titleAndHamburger">
+                    <h1>
+                        <a class="unstyledLink" href="/">giggi0x00hub</a>
+                        
+                    </h1>
+                    
+                </div>
+                <div id="wide_nav"><nav>
+    
+    <ul id="main-nav">
+        <li><a href="/">Home</a></li>
+        
+            <li><a href="/posts/">Posts</a></li>
+        
+        
+        
+        
+        
+            <li><a href="https://giggi0x00.github.io/pages/about/">
+                About
+            </a></li>
+        
+        
+        
+        
+    </ul>
+</nav>
+</div>
+            </div>
+        </div>
+        <div class="search">
+    <input id="searchbar" type="text" placeholder='Search' />
+    <span class="nerdlink" onclick="newSearch();">&#xf002;</span>
+</div>
+<script>
+    function newSearch() {
+        let term = searchbar.value.trim();
+        if (!term) return;
+        location.href = `/search/?q=${term}`;
+    }
+    searchbar.onkeyup = (ev) => {if (ev.keyCode == 13) newSearch()};
+</script>
+
+    </div>
+    <div id="links">
+        
+        
+        <a
+    
+        rel="noreferrer"
+    
+    target="_blank"
+    class="nerdlink"
+    href="https://github.com/giggi0x00">
+    
+    
+        &#xf09b;
+    
+    <span>
+        GitHub
+    </span>
+</a>
+<a
+    
+        rel="noreferrer"
+    
+    target="_blank"
+    class="nerdlink"
+    href="https://www.linkedin.com/in/luigi-fragale/">
+    
+    
+        &#xf0e1;
+    
+    <span>
+        LinkedIn
+    </span>
+</a>
+
+    </div>
+    
+
+</header>
+<div id="contentContainer">
+                <div id="content">
+                    <main>
+<article class="card single">
+    
+        <h1>Prepare an IoT devices for Power Analysis and Fault Injection</h1>
+    
+    
+        <p class="date">
+            <span title='Date'>󰃭 </span>
+    2024-11-30
+
+</p>
+    
+    
+    
+    
+    <div><p>The purpose of this blog post is to provide a guide on how to prepare a device for fault injection and power analysis attacks. While many blogs focus solely on explaining these attacks, they often overlook the critical preparation phase. We want to showcase a simple hardware modification (but very effective) that will make the attacks to be successful. Within this blog post we will use a classic STM32 development board to demonstrate how to make it susceptible to such attacks.</p>
+<h3 id="what-is-power-analysis">What is Power analysis</h3>
+<p>In a nutshell, power analysis attack falls into the category of side channel attacks, where, any emission of the electronic target under analysis can be turned to a powerful source of information. As implied by the name <code>Power Analysis</code> consists in analyzing the power consumption of the target while performing normal operations.
+For example, imagine the following piece of code:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-c" data-lang="c"><span style="display:flex;"><span><span style="color:#8be9fd">void</span> <span style="color:#50fa7b">checkpassoword</span>(<span style="color:#8be9fd">char</span> <span style="color:#ff79c6">*</span>buffer) {
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#8be9fd">int</span> res <span style="color:#ff79c6">=</span> <span style="color:#50fa7b">strcmp</span>(sPassword, buffer);
+</span></span><span style="display:flex;"><span><span style="color:#ff79c6">if</span> (res <span style="color:#ff79c6">==</span> <span style="color:#bd93f9">0</span>) {
+</span></span><span style="display:flex;"><span>	<span style="color:#50fa7b">unlock_the_secret_garden</span>();
+</span></span><span style="display:flex;"><span>  <span style="color:#ff79c6">return</span> <span style="color:#bd93f9">0</span>;
+</span></span><span style="display:flex;"><span>}
+</span></span><span style="display:flex;"><span><span style="color:#6272a4">//do_nothing..
+</span></span></span><span style="display:flex;"><span><span style="color:#6272a4"></span><span style="color:#ff79c6">return</span> <span style="color:#bd93f9">1</span>;
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><p>It is quite clear that if the password is correct the target will go through an extra set of instructions before returning, meaning that the power consumption will be higher. We want to spot these differences and understand the code paths and instructions being executed. This can be seen also to a transistor level, where there is a correlation between the power consumption and the operations that device is performing. It is therefore important to ensure that the power consumption associated with each action is accurately measured and free from interference. By &ldquo;free from interference,&rdquo; we mean that no additional factors are artificially increasing or decreasing the power used by the device during the analysis.
+The smallest fluctuations in consumption at low levels need to be emphasized in order to achieve accurate results.</p>
+<p>The design of the IoT device, for instance, focuses on maintaining stability by ensuring that tasks and operations are consistently performed with  a stable and constant voltage output. Keeping factors such as digital levels, frequency fluctuations, and power consumption within a trustworthy power level. To achieve so, components like voltage regulator, capacitors, diodes, or transistors play a crucial role.</p>
+<p>In order to effectively attack an electronic device, it is crucial to understand its design, identify key components, and make necessary modifications as required.</p>
+<h3 id="target-of-our-journey">Target of our journey</h3>
+<p>One of the target of our journey is the STM 32 Nucleo-64 development board. The board is a low-cost development platform for STM32 microcontrollers, used for prototyping embedded systems, programming firmware, and expanding with peripherals through Arduino-compatible connectors. It supports debugging and testing via an integrated ST-LINK, and is popular for IoT, automation, and learning purposes. Thus, it was used as subject for our analysis.</p>
+<p>The components on the board are visible on both sides of the PCB:</p>
+<p><img src="/images/prepare-for-poweranalysis/front.jpeg" alt=""></p>
+<p><img src="/images/prepare-for-poweranalysis/back.jpeg" alt=""></p>
+<p>We aim to demonstrate a Simple Power Analysis (SPA) attack on this board. For this purpose, the board has been programmed with firmware designed to emulate a login prompt which grants access to the main device&rsquo;s functionalities.
+The prompt is accessible via the UART interface and the following can be observed in the terminal when a wrong password is typed:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>$ sudo socat /dev/ttyUSB0,b115200,raw,echo<span style="color:#ff79c6">=</span>0,crnl -
+</span></span><span style="display:flex;"><span>Type your password to unlock the device:
+</span></span><span style="display:flex;"><span>AAAAAA
+</span></span><span style="display:flex;"><span>Access denied! 
+</span></span><span style="display:flex;"><span>Type your password to unlock the device:
+</span></span></code></pre></div><p><strong>The attack that will be carried out in order to circumvent this security defense is Simple Power Analysis. The objective is to measure the power consumption of the device while we send different passwords. Through a careful analysis will be possible to identify different cycles that a strcmp function will go through on each inputs</strong></p>
+<h3 id="preparation-of-the-target">Preparation of the target</h3>
+<p>[adding also where and how we tap there  why are and what we are measuring]</p>
+<p>We need to understand the PCB design, components, power lines, sources of randomness, potential security defenses, and any PCB components that could interfere with our attacks.</p>
+<p>First of all let&rsquo;s start by understand the power inputs line of the device. These can be easily identified by following the VCC power lines of our MCU and the available pins.</p>
+<p><img src="/images/prepare-for-poweranalysis/power-tracking-Page-2.drawio.png" alt=""></p>
+<p>The board has a publicly available datasheet; however, even without schematics, it is still possible to understand the power lines and make modifications in most cases. As we can see from the following schematic, there are many capacitors connected between the VCC and Ground. These capacitors, are meant to stabilize the power of the device, ensuring stability and normal execution conditions ( decoupling capacitor). For our purposes we can consider the the decoupling capacitor as if they are device’s local energy storage.</p>
+<p>First schematic, let&rsquo;s identify the capacitor based on what we have discussed earlier.</p>
+<p><img src="/images/prepare-for-poweranalysis/Pasted_image_20240928210141.png" alt=""></p>
+<p>Even without a schematic, these type of capacitors can be identified using a multimeter and a careful inspection of the PCB design.</p>
+<p>These capacitors were marked with yellow dots for identification.</p>
+<p><img src="/images/prepare-for-poweranalysis/power-tracking-Page-3.drawio_.png" alt=""></p>
+<p>However, we can see that other capacitors are still present on the board. These capacitors are related the power input in the following diagram. While we could also consider to remove them, it is possible to bypass the power circuit line using the JP6 connector and disconnect the power lines from the rest of the circuit. This will allow us to have VCC lines not affected by any electronic components, making possible power analysis possible.</p>
+<p><img src="/images/prepare-for-poweranalysis/Pasted_image_20240929035211.png" alt=""></p>
+<hr>
+<h4 id="hardware-modifications">Hardware modifications</h4>
+<p>The identified capacitors were disconnected from the board. As you can see from the following pictures only one pin was disconnected. The usage of soldering station or hot air gun could be very useful in these cases.</p>
+<p><img src="/images/prepare-for-poweranalysis/flipped-front.jpeg" alt=""></p>
+<p><img src="/images/prepare-for-poweranalysis/Pasted_image_20241007221540.png" alt=""></p>
+<hr>
+<h3 id="hardware-setup">Hardware setup</h3>
+<p><img src="/images/prepare-for-poweranalysis/hw_setup_drawio.png" alt=""></p>
+<p><strong>While preparing for the setup, always watch out for ground loop!!!</strong></p>
+<hr>
+<h3 id="time-to-attack-the-password-prompt">Time to attack the password prompt!</h3>
+<p>The board is now ready to be deeply analyzed for the power consumption, aiming to detect voltage fluctuations based on the execution cycles. The attack consists in attack one single byte of the password at the time.
+We can suppose that the device will compare the input with some value inside. This means that a routine like the following one could be implemented in the firmware:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-c" data-lang="c"><span style="display:flex;"><span><span style="color:#8be9fd">void</span> <span style="color:#50fa7b">checkpassoword</span>(<span style="color:#8be9fd">char</span> <span style="color:#ff79c6">*</span>buffer) {
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#8be9fd">int</span> res <span style="color:#ff79c6">=</span> <span style="color:#50fa7b">strcmp</span>(sPassword, buffer);
+</span></span><span style="display:flex;"><span><span style="color:#ff79c6">if</span> (res <span style="color:#ff79c6">==</span> <span style="color:#bd93f9">0</span>) {
+</span></span><span style="display:flex;"><span>	<span style="color:#6272a4">//do something
+</span></span></span><span style="display:flex;"><span><span style="color:#6272a4"></span>}
+</span></span><span style="display:flex;"><span>...
+</span></span><span style="display:flex;"><span>}
+</span></span></code></pre></div><p>Without going to much into the detail of the attack, we can simply understand the attack based on the following calculations:</p>
+<p>Let&rsquo;s assume the correct value is <code>AMSDATA</code>.</p>
+<p>We provide the following two inputs: <code>AMSAAAA</code> and <code>AMDDDDD</code>. The <code>strcmp</code> function compares each byte sequentially and returns when a match is found or a mismatch occurs. This means that the more correct characters we provide, the more execution cycles <code>strcmp</code> will take to complete, leading to a more power consumption.</p>
+<p>To fully understand the value of the hardware analysis and the changes made to the board, some power traces were collected before the modifications were implemented</p>
+<p>The power traces correspond to the power measurements of the device while the inputs are being processed.</p>
+<p>Let&rsquo;s have a look at how the power traces look like:
+The power traces before the modification look quite homogeneous, except some random spikes. It is very difficult to identify changes in the pattern across multiple inputs.</p>
+<p><img src="/images/prepare-for-poweranalysis/no_difference_observded.png" alt=""></p>
+<p><img src="/images/prepare-for-poweranalysis/no_difference_observded2.png" alt=""></p>
+<p>The following traces were collected with all capacitors disconnected from the PCB. As you can see, we have similar patterns as before; however, there is a noticeable change in the original power trace that requires further inspection.</p>
+<p><img src="/images/prepare-for-poweranalysis/Figure_1.png" alt=""></p>
+<p>If we zoom into the beginning of the diagram, we can observe that the Red trace diverges significantly from the rest of the power traces.</p>
+<p><img src="/images/prepare-for-poweranalysis/c_char_red_diverges.png" alt=""></p>
+<p>Final attack will come in the following post&hellip; STAY TUNED!</p>
+</div>
+</article>
+
+    <hr />
+    <p class="articleTagsContainer">
+        <span> </span>
+        <strong>Tags:</strong>
+        
+            <a
+                
+                href="/tags/fun/">#fun</a>
+        
+            <a
+                
+                href="/tags/hacking/">#hacking</a>
+        
+            <a
+                
+                href="/tags/hardware/">#hardware</a>
+        
+            <a
+                
+                href="/tags/iot/">#iot</a>
+        
+            <a
+                
+                href="/tags/poweranalysis/">#poweranalysis</a>
+        
+    </p>
+
+
+
+
+
+    
+    
+        
+        <div class="relatedArticlesContainer">
+            <hr />
+            <h2>More posts like this</h2>
+            <div class="postlist ">
+                <article class="card postlistitem">
+    <div>
+        <h2>
+            <a href="https://giggi0x00.github.io/posts/stm32rdpbypass/">Bypass STM32 Read Out Protection (RDP)</a>
+        </h2>
+        <p class="date">
+            <span title='Date'>󰃭 </span>
+    2024-01-02
+
+
+                | 
+                <span title='Tags'> </span>
+                
+                    <a href="/tags/faultinjection">#faultinjection</a>
+                
+                    <a href="/tags/hacking">#hacking</a>
+                
+                    <a href="/tags/hardware">#hardware</a>
+                
+                    <a href="/tags/iot">#iot</a>
+                
+                    <a href="/tags/stm32">#stm32</a>
+                
+            
+        </p>
+        
+            
+        
+        
+            <div class="articlePreview">
+                <p>
+                    
+                        <p>In this blog post, I will cover all the steps I took to circumvent the Read Out protection mechanism. For those unfamiliar with this security measure deployed by ST to safeguard firmware and customer data, here is a brief explanation from their website:</p>
+                    
+                </p>
+                <p><a href="https://giggi0x00.github.io/posts/stm32rdpbypass/">Continue reading </a></p>
+            </div>
+        
+    </div>
+    <hr />
+</article>
+
+            </div>
+        </div>
+    
+
+
+                    </main><footer>
+    <hr />
+
+<p><small>
+        2025 &copy; Luigi Fragale - <a href="https://creativecommons.org/licenses/by/4.0/">Creative Commons Attribution 4.0 International License</a>.
+    </small></p>
+    <p><small>
+        
+    </small></p>
+</footer>
+</div>
+            </div>
+        </div>
+
+
+</body>
+</html>
