@@ -9,7 +9,7 @@
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"/>
         <meta charset="UTF-8"/>
         
-        <link type="text/css" rel="stylesheet" href="https://giggi0x00.github.io/css/styles.11dd9b4f8e754057ce9e5c871170129bd0727d375643f3c7b3ea1cebc8a713bc0f506e4b359cade525b588692555ecfb93e267b9c03ea713c6c958a883527803.css" integrity="sha512-Ed2bT451QFfOnlyHEXASm9ByfTdWQ/PHs+oc68inE7wPUG5LNZyt5SW1iGklVez7k+JnucA+pxPGyViog1J4Aw==" />
+        <link type="text/css" rel="stylesheet" href="http://localhost:1313/css/styles.11dd9b4f8e754057ce9e5c871170129bd0727d375643f3c7b3ea1cebc8a713bc0f506e4b359cade525b588692555ecfb93e267b9c03ea713c6c958a883527803.css" integrity="sha512-Ed2bT451QFfOnlyHEXASm9ByfTdWQ/PHs+oc68inE7wPUG5LNZyt5SW1iGklVez7k+JnucA+pxPGyViog1J4Aw==" />
         <style>
           .aboutfeeds {
             margin: 24px 0; padding: 12px;

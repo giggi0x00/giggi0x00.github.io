@@ -1,20 +1,20 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?><?xml-stylesheet href="/feed_style.xsl" type="text/xsl"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:media="https://www.rssboard.org/media-rss">
   <channel>
     <title>Tags on giggi0x00hub</title>
-    <link>https://giggi0x00.github.io/tags/</link>
+    <link>http://localhost:1313/tags/</link>
     <description>Recent content in Tags on giggi0x00hub</description>
     <generator>Hugo -- gohugo.io</generator>
     <language>en-us</language>
     <copyright>Luigi Fragale - [Creative Commons Attribution 4.0 International License](https://creativecommons.org/licenses/by/4.0/).</copyright>
-    <lastBuildDate>Sat, 30 Nov 2024 09:42:43 +0100</lastBuildDate><atom:link href="https://giggi0x00.github.io/tags/index.xml" rel="self" type="application/rss+xml" /><icon>https://giggi0x00.github.io/logo.svg</icon>
+    <lastBuildDate>Sat, 30 Nov 2024 09:42:43 +0100</lastBuildDate><atom:link href="http://localhost:1313/tags/index.xml" rel="self" type="application/rss+xml" /><icon>http://localhost:1313/logo.svg</icon>
     
     
     <item>
       <title>Fun</title>
-      <link>https://giggi0x00.github.io/tags/fun/</link>
+      <link>http://localhost:1313/tags/fun/</link>
       <pubDate>Sat, 30 Nov 2024 09:42:43 +0100</pubDate>
       
-      <guid>https://giggi0x00.github.io/tags/fun/</guid>
+      <guid>http://localhost:1313/tags/fun/</guid>
       <description><![CDATA[]]></description>
       
     </item>
@@ -23,10 +23,10 @@
     
     <item>
       <title>Hacking</title>
-      <link>https://giggi0x00.github.io/tags/hacking/</link>
+      <link>http://localhost:1313/tags/hacking/</link>
       <pubDate>Sat, 30 Nov 2024 09:42:43 +0100</pubDate>
       
-      <guid>https://giggi0x00.github.io/tags/hacking/</guid>
+      <guid>http://localhost:1313/tags/hacking/</guid>
       <description><![CDATA[]]></description>
       
     </item>
@@ -35,10 +35,10 @@
     
     <item>
       <title>Hardware</title>
-      <link>https://giggi0x00.github.io/tags/hardware/</link>
+      <link>http://localhost:1313/tags/hardware/</link>
       <pubDate>Sat, 30 Nov 2024 09:42:43 +0100</pubDate>
       
-      <guid>https://giggi0x00.github.io/tags/hardware/</guid>
+      <guid>http://localhost:1313/tags/hardware/</guid>
       <description><![CDATA[]]></description>
       
     </item>
@@ -47,10 +47,10 @@
     
     <item>
       <title>Iot</title>
-      <link>https://giggi0x00.github.io/tags/iot/</link>
+      <link>http://localhost:1313/tags/iot/</link>
       <pubDate>Sat, 30 Nov 2024 09:42:43 +0100</pubDate>
       
-      <guid>https://giggi0x00.github.io/tags/iot/</guid>
+      <guid>http://localhost:1313/tags/iot/</guid>
       <description><![CDATA[]]></description>
       
     </item>
@@ -59,10 +59,10 @@
     
     <item>
       <title>Poweranalysis</title>
-      <link>https://giggi0x00.github.io/tags/poweranalysis/</link>
+      <link>http://localhost:1313/tags/poweranalysis/</link>
       <pubDate>Sat, 30 Nov 2024 09:42:43 +0100</pubDate>
       
-      <guid>https://giggi0x00.github.io/tags/poweranalysis/</guid>
+      <guid>http://localhost:1313/tags/poweranalysis/</guid>
       <description><![CDATA[]]></description>
       
     </item>
@@ -71,10 +71,10 @@
     
     <item>
       <title>Faultinjection</title>
-      <link>https://giggi0x00.github.io/tags/faultinjection/</link>
+      <link>http://localhost:1313/tags/faultinjection/</link>
       <pubDate>Tue, 02 Jan 2024 09:42:43 +0100</pubDate>
       
-      <guid>https://giggi0x00.github.io/tags/faultinjection/</guid>
+      <guid>http://localhost:1313/tags/faultinjection/</guid>
       <description><![CDATA[]]></description>
       
     </item>
@@ -83,10 +83,10 @@
     
     <item>
       <title>Stm32</title>
-      <link>https://giggi0x00.github.io/tags/stm32/</link>
+      <link>http://localhost:1313/tags/stm32/</link>
       <pubDate>Tue, 02 Jan 2024 09:42:43 +0100</pubDate>
       
-      <guid>https://giggi0x00.github.io/tags/stm32/</guid>
+      <guid>http://localhost:1313/tags/stm32/</guid>
       <description><![CDATA[]]></description>
       
     </item>
