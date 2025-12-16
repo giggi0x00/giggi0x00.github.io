@@ -16,14 +16,15 @@
       
       <guid>https://giggi0x00.github.io/posts/radio-signal-ctf/</guid>
       <description><![CDATA[<hr>
-<p><em>DISCLAIMER: This write-up is based on the original solution created by the author of the Hammingbird radio-signal CTF challenge <a href="https://aleand.ro/2025/09/24/hamming-bird-ctrl-space-ctf/">you can find it here</a>. Many thanks to @aleand.ro. The purpose of this exercise is to redesign the solution using GNU Radio solely for the purpose of learning more about radio signals, exploring GNU Radio, and having fun. This blog post is written with passion, dedication and a lot of hours debugging GNU Radio.</em></p>
+<p><em>DISCLAIMER: This write-up is based on the original solution created by the author of the Hammingbird radio-signal CTF challenge <a href="https://aleand.ro/2025/09/24/hamming-bird-ctrl-space-ctf/">you can find it here</a>. Many thanks to @aleand.ro. The purpose of this exercise is to redesign the solution using GNU Radio solely for the purpose of learning more about radio signals, exploring the tool, and having fun. This blog post is written with passion, dedication and a lot of hours debugging GNU Radio.</em></p>
+<p>For those who are not familiar with GNU Radio, you can find a clear and concise explanation here: <a href="https://wiki.gnuradio.org/index.php?title=What_Is_GNU_Radio">https://wiki.gnuradio.org/index.php?title=What_Is_GNU_Radio</a></p>
 <hr>
 <h2 id="challenge-description">Challenge Description</h2>
 <p>The <code>Hamming Bird</code> radio-signal CTF challenge is part of the <code>Ctrl-Space CTF 2025</code>, a unique cybersecurity competition played on real satellites orbiting Earth. The goal of the challenge is to reverse-engineer the radio signal to uncover a secret message hidden within the broadcast transmission.</p>
 <blockquote>
 <p>A flying bird is transmitting some telemetry data; check if any important information has been broadcast!</p>
 </blockquote>
-<p>In offline radio-signal challenges, the player is typically given a complex file captured from radio transmissions. In this case, the input provided is the file <code>rf-dump.complex</code>. The extension already hints that the file contains complex samples representing a radio signal, stored as real and imaginary components ( z = a + bi ).</p>
+<p>In offline radio-signal challenges, the player is typically given a complex file captured from radio transmissions. In this case, the input provided is the file <code>rf-dump.complex</code>. The extension already hints that the file could contain a radio signal representation.</p>
 <p>Let&rsquo;s load the file into GNU Radio using the <code>File Source</code> block and observe the frequency span with the <code>QT GUI Frequency Sink</code>. Initially, we can set the sample rate to a high value such as 100k. This value should match the expected bandwidth, allowing us to load the entire signal into the frequency spectrum for observation.</p>
 <p><img src="/images/firstblock.png" alt="QT GUI Frequency Sink"></p>
 <p><img src="/images/output.gif" alt="QT GUI Frequency Sink"></p>
@@ -106,8 +107,11 @@ This behavior can be further examined using the <code>QT GUI Waterfall Sink</cod
 </span></span><span style="display:flex;"><span>                    <span style="color:#6272a4">#print(&#34;Packet&#34;)</span>
 </span></span><span style="display:flex;"><span>                    <span style="color:#6272a4">#print(burst);</span>
 </span></span><span style="display:flex;"><span>                    <span style="font-style:italic">self</span><span style="color:#ff79c6">.</span>parse(burst)
-</span></span></code></pre></div><p>The entire code can be found on my Github repository <a href="https://github.com/giggi0x00/Radio_Signal_CTF_Ctrl-Space_CTF_2025">https://github.com/giggi0x00/Radio_Signal_CTF_Ctrl-Space_CTF_2025</a>.</p>
+</span></span></code></pre></div><p>In a nutshell, the Python block detects the preamble and uses the provided threshold parameter for similarity estimation. It then decodes the packet using the Hamming algorithm and prints the payload to the screen. The full output is available on Gnu Radio in the console window.</p>
 <p><img src="/images/python-processing.gif" alt="Python Block"></p>
+<p>The entire code can be found on my Github repository <a href="https://github.com/giggi0x00/Radio_Signal_CTF_Ctrl-Space_CTF_2025">https://github.com/giggi0x00/Radio_Signal_CTF_Ctrl-Space_CTF_2025</a>.</p>
+<h3 id="conclusion">Conclusion</h3>
+<p>Although I was unable to complete the challenge within the allocated time during the CTF, I continued working on it afterward to learn more about radio signals and, in particular, the GNU Radio tool, which can help speed up signal processing without reinventing the wheel. Thank you for making it this far! Happy hacking!</p>
 ]]></description>
       
     </item>
