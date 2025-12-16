@@ -34,7 +34,7 @@ This behavior can be further examined using the <code>QT GUI Waterfall Sink</cod
 <p>While Inspectrum can already help already with some basic demodulation it is still limited in signal processing, therefore, from now on we will use Gnu Radio.</p>
 <h3 id="lets-start">Let&rsquo;s start!</h3>
 <p>We begin with filtering and re-centering the signal to make later processing steps easier. For this task, we use a frequency-translating FIR filter. This block takes two main inputs: a <em>taps</em> function and a <em>center frequency</em>.</p>
-<p>While the center frequency parameter is straightforward, the taps function can be less intuitive. In simple terms, the taps define the filter characteristics, for example, the low cutoff, high cutoff, or both, determine which frequency components are allowed to pass through (many others parameters are described in the documentation). A detailed explanation of the remaining parameters can be found <a href="https://wiki.gnuradio.org/index.php/Frequency_Xlating_FIR_Filter">here</a>.</p>
+<p>While the center frequency parameter is straightforward, the taps function can be less intuitive. In simple terms, the taps define the filter characteristics, for example, the low cutoff, high cutoff, or both, determine which frequency components are allowed to pass through. <em>Many others parameters are described in the documentation <a href="https://wiki.gnuradio.org/index.php/Frequency_Xlating_FIR_Filter">here</a></em>.</p>
 <p><img src="/images/low-pass-filter-and-center.png" alt="Frequency Xltaing FIR Filter"></p>
 <p>The FIR filter produces a new signal, shown below in the first waterfall plot:</p>
 <p><img src="/images/filtering.gif" alt="Filtering"></p>
