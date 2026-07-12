@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><?xml-stylesheet href="/feed_style.xsl" type="text/xsl"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:media="https://www.rssboard.org/media-rss">
+  <channel>
+    <title>Security on giggi0x00hub</title>
+    <link>http://localhost:1313/tags/security/</link>
+    <description>Recent content in Security on giggi0x00hub</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en-us</language>
+    <copyright>Luigi Fragale - [Creative Commons Attribution 4.0 International License](https://creativecommons.org/licenses/by/4.0/).</copyright>
+    <lastBuildDate>Fri, 26 Jun 2026 00:00:00 +0000</lastBuildDate><atom:link href="http://localhost:1313/tags/security/index.xml" rel="self" type="application/rss+xml" /><icon>http://localhost:1313/logo.svg</icon>
+    
+    
+    <item>
+      <title>Intercepting Analog FPV Video: From War Drone OSINT to the Bench</title>
+      <link>http://localhost:1313/posts/analog-fpv-interception-war-drones/</link>
+      <pubDate>Fri, 26 Jun 2026 00:00:00 +0000</pubDate>
+      
+      <guid>http://localhost:1313/posts/analog-fpv-interception-war-drones/</guid>
+      <description><![CDATA[<hr>
+<p><em>DISCLAIMER: This post is educational. Scope is signal engineering and SDR decoding on hardware you own. Intercepting third-party video links is regulated in most jurisdictions. Transmitting above 25 mW on 5.8 GHz without an amateur radio licence is restricted in the EU and most other regions. Bench work should use a faraday cage or cable connection.</em></p>
+<hr>
+<h3 id="osint-video-transmitters-in-captured-war-drones">OSINT: Video Transmitters in Captured War Drones</h3>
+<p>Often the same FPV components you can buy for a racing drone, or similar, end up inside active strike UAVs (Unmanned Aerial Vehicles). Not counterfeit versions, not military-grade derivatives: the actual same modules, sometimes still with the original packaging and firmware. What makes this particularly interesting from a security research perspective is that the video link is often not scrambled or encrypted. The analog VTXs presented below don&rsquo;t have video protection capabilities by design; they&rsquo;d rely on additional hardware components for scrambling. Naturally, they were built for low-latency racing, not operational security.</p>
+<p><em>As a side note, this isn&rsquo;t secret information: people have been using software defined radio to decode live streaming video for quite some time.</em></p>
+<p>This post starts with what OSINT has surfaced about VTX modules recovered from captured war drones, then introduces the Rush FPV Max Solo as the bench reference, and walks through decoding its analog video stream live using a HackRF and two tools, GQRX and SDRAngel.</p>
+<h4 id="methodology">Methodology</h4>
+<p>The primary sources here come from Ukrainian and Russian open-source communities that have been cataloguing hardware; a non-exhaustive list is presented below.</p>
+<ul>
+<li><strong><a href="https://reibert.info">Reibert.info</a></strong> is a Ukrainian military forum and auction site where recovered drone components are listed with photos, measured specs, and sometimes original datasheets. &ldquo;Видео передач VTX&rdquo; <a href="https://reibert.info/lots/video-peredach-vtx.1820297">SX33 and Foxeer Infinity from Molniya</a> and <a href="https://reibert.info/lots/videoperedavach-vid-bpla-molniya-vtx-a100-5.8-ghz.1826917">Відеопередавач від БПЛА Молнія VTX A100 5.8 GHz</a></li>
+<li><strong>Telegram: FPV_vyZOV</strong> is a Russian-language FPV analysis channel that publishes teardown notes and spectrum measurements from captured drones.</li>
+<li><strong>GUR Ukraine</strong> publishes Ukrainian military intelligence disclosures on captured airframes, including <a href="https://gur.gov.ua/en/content/warsanctions-rozkryvaie-nachynku-modernizovanoho-shahed136-vyrobnytstva-iranu-z-kameroiu-ta-shtuchnym-intelektom">this breakdown of a modernised Shahed-136 with camera and AI guidance</a>.</li>
+<li><strong>VGI</strong> published <a href="https://vgi.com.ua/en/the-race-for-drone-independence-ukraines-fpv-component-ecosystem/">The Race for Drone Independence: Ukraine&rsquo;s FPV Component Ecosystem</a></li>
+<li><strong>Social media / community</strong>: <a href="https://www.instagram.com/reels/DL1U7QxIMa0/">Обережно Дрони on Instagram</a> shows component-level FPV builds (SpeedyBee TX800 VTX, CaddxRatel2V2 camera, Radiomaster Bandit) matching documented war drone builds.</li>
+<li><strong>Civ Div</strong> is a YouTube channel doing hands-on OSINT teardowns and analysis of captured military hardware and drones; see <a href="https://www.youtube.com/watch?v=5_O7dWgMa6I">Inside the Kamikaze Drone</a></li>
+</ul>
+<p>A recovered example of the Russian <em>Molniya</em> documented on Reibert (May–June 2026) carried three distinct VTXs at once: the SX33, an unusual 3.2–3.7 GHz analog module built for a band most commercial jammers don&rsquo;t cover; the Foxeer Reaper Infinity, a commercial 5.8 GHz unit sold openly for $80–100; and a less-documented 5.8 GHz module. Other variants go further still. Reporting on the modernised Shahed-136 describes onboard AI compute doing camera-based target recognition and terminal guidance, a different class of capability from the analog video link this post is about. Between the three-VTX Molniya, AI-assisted Shahed variants, and the Pegas, we can definitely see quite a large variety of products. Therefore, treat every spec in this post as a snapshot, not a complete picture.</p>
+<h4 id="what-osint-tells-us">What OSINT Tells Us</h4>
+<p>Two things stand out from this data.</p>
+<p>First, analog is still dominant in low-cost strike drones. Second, frequency diversification is used as a countermeasure. The SX33 at 3.3 GHz and the Pegas VTX at 7.5–12 GHz are both deliberate attempts to step outside standard jamming envelopes.</p>
+<hr>
+<h3 id="the-rush-fpv-max-solo-bench-reference">The Rush FPV Max Solo: Bench Reference</h3>
+<p>To understand interception, you need to work with real hardware. The Rush FPV Max Solo is taken as reference for a small education guide.
+Its specs map directly onto what OSINT documents in captured drones (see references above).</p>
+<p>The <a href="https://rushfpv.net/products/rushfpv-max-solo-vtx">Rush FPV Max Solo</a> is a 5.8 GHz analog video transmitter, marketed by the manufacturer for both racing and one-way FPV drones, as shown in <a href="https://www.youtube.com/watch?v=5_O7dWgMa6I">this reference video</a>. Specs:</p>
+<ul>
+<li><strong>Frequency:</strong> 5.8 GHz, 48 channels (37-channel US variant)</li>
+<li><strong>Power levels:</strong> PIT / 25 mW / 500 mW / 1000 mW</li>
+<li><strong>Input voltage:</strong> 7–36 V (2S–6S LiPo compatible)</li>
+<li><strong>Camera output:</strong> 5 V / 500 mA regulated rail</li>
+<li><strong>Control:</strong> Smart Audio (serial protocol from flight controller)</li>
+<li><strong>Antenna connector:</strong> MMCX</li>
+<li><strong>Cooling:</strong> active fan</li>
+<li><strong>Price:</strong> $49.99</li>
+</ul>
+<p>Here&rsquo;s an example of a Rush FPV Max Solo mounted on a drone:
+<img src="/images/analog-fpv-interception-war-drones/rush-mounted.png" alt=""></p>
+<p>It takes standard CVBS composite video from any analog camera and FM-modulates it onto the 5.8 GHz carrier. The signal is clear and unscrambled.</p>
+<h4 id="pairing-it-with-a-camera">Pairing It With a Camera</h4>
+<p>For the decode chain we&rsquo;ll use an <strong>MS-1800 Mini</strong> camera (5–40 V input, PAL/NTSC). It&rsquo;s an analog CVBS camera, which is all the VTX cares about. Wiring is three wires:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-fallback" data-lang="fallback"><span style="display:flex;"><span>Camera V+   → VTX 5V out
+</span></span><span style="display:flex;"><span>Camera GND  → VTX GND
+</span></span><span style="display:flex;"><span>Camera video out → VTX video in
+</span></span></code></pre></div><p>The VTX itself is powered from the flight battery (2S–6S, 7–36 V). One caution: the 5V pad is camera-only, so never loop it back to the battery input.</p>
+<h4 id="channels-bands-and-configuration">Channels, Bands, and Configuration</h4>
+<p>According to the <a href="https://cdn.shopify.com/s/files/1/0628/1320/8746/files/SOLOMAX_2.jpg?v=1671004521">Rush FPV Solo manual</a>, the 48 channels are organised into 6 bands of 8 channels each. Each band × channel pair maps to a fixed centre frequency in the 5.6–5.9 GHz range:</p>
+<p><img src="/images/analog-fpv-interception-war-drones/rush-bands.png" alt=""></p>
+<p><strong>Setting band, channel, and power with the on-board button (no flight controller needed):</strong> the VTX boots to whatever band/channel it last saved, and the single button on the board controls the rest. A short press cycles through power levels (PIT → 25 mW → 500 mW → 1000 mW); a long press steps through the 8 channels within the current band; the LED blink pattern reports which band you&rsquo;re currently on. This is the path used for the bench rig in this post; no Smart Audio wiring required for this test.</p>
+<h3 id="finding-and-decoding-the-drone-video-transmissions">Finding and Decoding the Drone Video Transmissions</h3>
+<p>To start with playing with the VTX transmitter, I purchased one and I hooked up an analog video camera, here my setup:</p>
+<p><img src="/images/analog-fpv-interception-war-drones/image-6.png" alt="RushFPV Max Solo"></p>
+<p>The MS-1800 camera is wired to the VTX&rsquo;s 5 V/GND/video pads. The VTX was powered externally via a bench power supply, while the camera draws its power from the VTX itself (cool!).</p>
+<p><img src="/images/analog-fpv-interception-war-drones/image-7.png" alt="Camera + VTX"></p>
+<p>For the purpose of this walkthrough, treat the configured channel as unknown.</p>
+<h4 id="finding-the-carrier-gqrx">Finding the Carrier (GQRX)</h4>
+<p>Open GQRX, select the HackRF as the source, set the input rate to 20 MHz, and sweep the waterfall across 5.6–5.9 GHz. The bandwidth should be enough to cover all the channels, but at the edges the HackRF is usually noisy and not reliable, so move through the band with a narrow scope to spot transmissions.</p>
+<p><img src="/images/analog-fpv-interception-war-drones/gif1.gif" alt="GQRX"></p>
+<p>Once you find something, one first test would be to look at the spectrum and check <a href="https://www.sigidwiki.com">SIGIDWiki</a> for similar visual pattern, another help can come from <a href="https://aresvalley.com/">Artemis</a>, a database of signals with several browsable properties.</p>
+<p>Analog FM video has a distinctive dense, static-like fill in the waterfall, quite different from the narrow spike a digital carrier leaves. That&rsquo;s what separates it from Wi-Fi and other digital traffic sharing the band. Once the bar shows up, read its center frequency directly off the waterfall.</p>
+<h4 id="decoding-the-picture-sdrangel">Decoding the Picture (SDRAngel)</h4>
+<p>Once you know where the carrier actually sits, it is time to fire up SDRAngel and switch the HackRF&rsquo;s input over to it. Center frequency at the peak just measured, sample rate at 20 MHz.</p>
+<p>The actual decoding happens in SDRAngel&rsquo;s <strong>ATV Demodulator</strong> channel plugin, built specifically for analog television, which does FM demodulation and composite-sync decoding in one place and renders the picture straight into the SDRAngel GUI.</p>
+<p><img src="/images/analog-fpv-interception-war-drones/gif2.gif" alt="SDRAngel In Action - Part 1"></p>
+<p>Set the video standard, and then use the FM deviation slider to control the live feed. You can also tweak the threshold level to determine what&rsquo;s considered white and what&rsquo;s considered black, as well as vsync and hsync. Keep tweaking until the image looks right.</p>
+<p><img src="/images/analog-fpv-interception-war-drones/gif3.gif" alt="SDRAngel In Action - Part 2 "></p>
+<p>What you&rsquo;re looking at, once it locks, is exactly what an analog-VTX drone&rsquo;s operator sees on their goggles (but with colours): same modulation, same baseband, same failure modes. The only difference is doing it on a bench with a dummy load and a camera pointed at your desk.</p>
+<h2 id="conclusion">Conclusion</h2>
+<p>The bench result is the point: an off-the-shelf VTX and an SDR and powerful open-source software are enough to pull a clean picture out of the air, no pairing, no key exchange, nothing to break. That comes from the analog FM design itself, not from anything specific to this module.</p>
+<p>That said, this post&rsquo;s scope was narrow: analog, unencrypted, fixed-channel VTX, which the OSINT section shows is a common choice in cheap strike drones, but not the only one out there. There&rsquo;s field evidence for at least four other approaches this article never touched.</p>
+<p>The first is frequency hopping, known as FHSS. Instead of sitting on one channel for the whole flight, the transmitter hops across a pseudorandom sequence many times a second, synced to the receiver, which defeats a narrowband receiver and a casual GQRX sweep like the one in this post: by the time you&rsquo;ve found the energy, it&rsquo;s moved. It doesn&rsquo;t defeat a wideband SDR recording the whole span and reconstructing the hop sequence afterward; that&rsquo;s a signal-processing problem, not an unbreakable one. None of the war-drone VTXs in the OSINT section use it, though commercial digital systems such as DJI and Walksnail may do.</p>
+<p>Then there&rsquo;s scrambling: inverting or permuting the video signal in a reversible but non-obvious way, through line inversion or sync suppression, much like analog cable and satellite TV did decades ago. It&rsquo;s cheap and stops a plain composite decoder, but it doesn&rsquo;t survive an attacker who reverse-engineers the scheme.</p>
+<p>Encryption is what those same digital systems (not an analog VTX but a digital VTX) already do at the protocol level, so a passive SDR sees noise-shaped digital modulation and nothing else.</p>
+<p>The last, and the most decisive, is fiber optic. FPV drones trail a spooled fiber-optic cable back to the operator instead of transmitting video at all, an approach seen extensively on both sides in Ukraine since 2024. It answers interception specifically, not just jamming, since there&rsquo;s nothing to intercept when nothing goes over the air.</p>
+<p>In the next posts I&rsquo;ll see what we can actually do as a next step based on budget and availability, so stay tuned! Let me know if you have any suggestions, or something in particular you&rsquo;d like to see covered.</p>
+<p>Bye!</p>
+]]></description>
+      
+    </item>
+    
+    
+  </channel>
+</rss>
