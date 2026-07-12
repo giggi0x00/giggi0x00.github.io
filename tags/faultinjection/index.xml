@@ -1,20 +1,20 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?><?xml-stylesheet href="/feed_style.xsl" type="text/xsl"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:media="https://www.rssboard.org/media-rss">
   <channel>
     <title>Faultinjection on giggi0x00hub</title>
-    <link>http://localhost:1313/tags/faultinjection/</link>
+    <link>https://giggi0x00.github.io/tags/faultinjection/</link>
     <description>Recent content in Faultinjection on giggi0x00hub</description>
     <generator>Hugo -- gohugo.io</generator>
     <language>en-us</language>
     <copyright>Luigi Fragale - [Creative Commons Attribution 4.0 International License](https://creativecommons.org/licenses/by/4.0/).</copyright>
-    <lastBuildDate>Tue, 02 Jan 2024 09:42:43 +0100</lastBuildDate><atom:link href="http://localhost:1313/tags/faultinjection/index.xml" rel="self" type="application/rss+xml" /><icon>http://localhost:1313/logo.svg</icon>
+    <lastBuildDate>Tue, 02 Jan 2024 09:42:43 +0100</lastBuildDate><atom:link href="https://giggi0x00.github.io/tags/faultinjection/index.xml" rel="self" type="application/rss+xml" /><icon>https://giggi0x00.github.io/logo.svg</icon>
     
     
     <item>
       <title>Bypass STM32 Read Out Protection (RDP)</title>
-      <link>http://localhost:1313/posts/stm32rdpbypass/</link>
+      <link>https://giggi0x00.github.io/posts/stm32rdpbypass/</link>
       <pubDate>Tue, 02 Jan 2024 09:42:43 +0100</pubDate>
       
-      <guid>http://localhost:1313/posts/stm32rdpbypass/</guid>
+      <guid>https://giggi0x00.github.io/posts/stm32rdpbypass/</guid>
       <description><![CDATA[<p>In this blog post, I will cover all the steps I took to circumvent the Read Out protection mechanism. For those unfamiliar with this security measure deployed by ST to safeguard firmware and customer data, here is a brief explanation from their website:</p>
 <ul>
 <li><a href="https://www.st.com/resource/en/product_training/STM32F7_Security_Memories_Protections.pdf">https://www.st.com/resource/en/product_training/STM32F7_Security_Memories_Protections.pdf</a>:</li>

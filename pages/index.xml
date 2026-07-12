@@ -1,12 +1,12 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?><?xml-stylesheet href="/feed_style.xsl" type="text/xsl"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:media="https://www.rssboard.org/media-rss">
   <channel>
     <title>Pages on giggi0x00hub</title>
-    <link>http://localhost:1313/pages/</link>
+    <link>https://giggi0x00.github.io/pages/</link>
     <description>Recent content in Pages on giggi0x00hub</description>
     <generator>Hugo -- gohugo.io</generator>
     <language>en-us</language>
     <copyright>Luigi Fragale - [Creative Commons Attribution 4.0 International License](https://creativecommons.org/licenses/by/4.0/).</copyright>
-    <lastBuildDate>Fri, 01 Nov 2024 10:14:48 +0000</lastBuildDate><atom:link href="http://localhost:1313/pages/index.xml" rel="self" type="application/rss+xml" /><icon>http://localhost:1313/logo.svg</icon>
+    <lastBuildDate>Fri, 01 Nov 2024 10:14:48 +0000</lastBuildDate><atom:link href="https://giggi0x00.github.io/pages/index.xml" rel="self" type="application/rss+xml" /><icon>https://giggi0x00.github.io/logo.svg</icon>
     
     
     
